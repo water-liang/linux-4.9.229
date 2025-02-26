@@ -1021,7 +1021,7 @@ static struct inet_protosw inetsw_array[] =
 
        {
 	       .type =       SOCK_RAW,
-	       .protocol =   IPPROTO_IP,	/* wild card */
+	       .protocol =   IPPROTO_IP,	/* wild card 通配协议*/
 	       .prot =       &raw_prot,
 	       .ops =        &inet_sockraw_ops,
 	       .flags =      INET_PROTOSW_REUSE,
