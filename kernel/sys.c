@@ -174,6 +174,20 @@ out:
 	return error;
 }
 
+SYSCALL_DEFINE3(test, char __user *, str, int, count)
+{
+    int ret = 0;
+    char buffer[256] = {0};
+    if (count >= 256)
+    {
+        return -1;
+    }
+
+    ret = copy_from_user(buffer, str, count);
+    printk("app send %s to the kernel!\n", buffer);
+    return 0;
+}
+
 SYSCALL_DEFINE3(setpriority, int, which, int, who, int, niceval)
 {
 	struct task_struct *g, *p;
@@ -237,6 +251,9 @@ out_unlock:
 out:
 	return error;
 }
+
+
+
 
 /*
  * Ugh. To avoid negative return values, "getpriority()" will
