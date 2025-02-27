@@ -261,6 +261,7 @@ static int inet_create(struct net *net, struct socket *sock, int protocol,
 lookup_protocol:
 	err = -ESOCKTNOSUPPORT;
 	rcu_read_lock();
+	// 确定协议
 	list_for_each_entry_rcu(answer, &inetsw[sock->type], list) {
 
 		err = 0;
@@ -307,7 +308,9 @@ lookup_protocol:
 	    !ns_capable(net->user_ns, CAP_NET_RAW))
 		goto out_rcu_unlock;
 
+	// 赋值为 协议的ops
 	sock->ops = answer->ops;
+	// 协议的实现
 	answer_prot = answer->prot;
 	answer_flags = answer->flags;
 	rcu_read_unlock();
@@ -315,6 +318,8 @@ lookup_protocol:
 	WARN_ON(!answer_prot->slab);
 
 	err = -ENOBUFS;
+	// 创建sock
+	// struct sock 为 协议栈使用的struct
 	sk = sk_alloc(net, PF_INET, GFP_KERNEL, answer_prot, kern);
 	if (!sk)
 		goto out;
@@ -341,10 +346,11 @@ lookup_protocol:
 
 	inet->inet_id = 0;
 
+	// sk被赋值给sock
 	sock_init_data(sock, sk);
 
 	sk->sk_destruct	   = inet_sock_destruct;
-	sk->sk_protocol	   = protocol;
+	sk->sk_protocol	   = protocol;// 协议号
 	sk->sk_backlog_rcv = sk->sk_prot->backlog_rcv;
 
 	inet->uc_ttl	= -1;
@@ -372,6 +378,8 @@ lookup_protocol:
 		}
 	}
 
+	// 协议init
+	// 赋值 地址族相关的函数 ex:ipv4
 	if (sk->sk_prot->init) {
 		err = sk->sk_prot->init(sk);
 		if (err)
@@ -997,8 +1005,8 @@ static struct inet_protosw inetsw_array[] =
 	{
 		.type =       SOCK_STREAM,
 		.protocol =   IPPROTO_TCP,
-		.prot =       &tcp_prot,
-		.ops =        &inet_stream_ops,
+		.prot =       &tcp_prot,// 指定特定协议的实现
+		.ops =        &inet_stream_ops,// ops指向对应的当前协议的操作函数集
 		.flags =      INET_PROTOSW_PERMANENT |
 			      INET_PROTOSW_ICSK,
 	},

@@ -625,6 +625,7 @@ void __fd_install(struct files_struct *files, unsigned int fd,
 
 void fd_install(unsigned int fd, struct file *file)
 {
+	// current->files 是一个用于访问当前进程文件描述符表的表达式
 	__fd_install(current->files, fd, file);
 }
 

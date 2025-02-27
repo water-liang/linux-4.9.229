@@ -1391,6 +1391,7 @@ struct sock *sk_alloc(struct net *net, int family, gfp_t priority,
 		 * See comment in struct sock definition to understand
 		 * why we need sk_prot_creator -acme
 		 */
+		// 协议实现赋值
 		sk->sk_prot = sk->sk_prot_creator = prot;
 		sock_lock_init(sk);
 		sk->sk_net_refcnt = kern ? 0 : 1;

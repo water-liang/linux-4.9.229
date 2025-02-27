@@ -434,12 +434,15 @@ EXPORT_SYMBOL(sock_alloc_file);
 static int sock_map_fd(struct socket *sock, int flags)
 {
 	struct file *newfile;
+	// 获取一个未使用的fd
 	int fd = get_unused_fd_flags(flags);
 	if (unlikely(fd < 0))
 		return fd;
 
+	// sock 和file 相关联
 	newfile = sock_alloc_file(sock, flags, NULL);
 	if (likely(!IS_ERR(newfile))) {
+		// 将file和fd关联
 		fd_install(fd, newfile);
 		return fd;
 	}
@@ -551,6 +554,7 @@ struct socket *sock_alloc(void)
 	struct inode *inode;
 	struct socket *sock;
 
+	// 虚拟文件系统的inode
 	inode = new_inode_pseudo(sock_mnt->mnt_sb);
 	if (!inode)
 		return NULL;
