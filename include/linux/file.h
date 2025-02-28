@@ -20,6 +20,7 @@ struct path;
 extern struct file *alloc_file(struct path *, fmode_t mode,
 	const struct file_operations *fop);
 
+	// fput  file的引用计数-1
 static inline void fput_light(struct file *file, int fput_needed)
 {
 	if (fput_needed)

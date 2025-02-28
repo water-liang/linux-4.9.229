@@ -416,8 +416,8 @@ struct sock {
 	rwlock_t		sk_callback_lock;
 	int			sk_err,
 				sk_err_soft;
-	u32			sk_ack_backlog;
-	u32			sk_max_ack_backlog;
+	u32			sk_ack_backlog;	//tcp当前队列的大小
+	u32			sk_max_ack_backlog;	// tcp 全连接最大长度
 	__u32			sk_priority;
 	__u32			sk_mark;
 	struct pid		*sk_peer_pid;

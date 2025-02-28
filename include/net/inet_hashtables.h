@@ -130,7 +130,7 @@ struct inet_hashinfo {
 	/* Ok, let's try this, I give up, we do need a local binding
 	 * TCP hash as well as the others for fast bind/connect.
 	 */
-	struct inet_bind_hashbucket	*bhash;
+	struct inet_bind_hashbucket	*bhash; //bind的hash
 
 	unsigned int			bhash_size;
 	/* 4 bytes hole on 64 bit */
@@ -148,7 +148,7 @@ struct inet_hashinfo {
 	 * is just local port number.
 	 */
 	struct inet_listen_hashbucket	listening_hash[INET_LHTABLE_SIZE]
-					____cacheline_aligned_in_smp;
+					____cacheline_aligned_in_smp;	// listen的hash
 };
 
 static inline struct inet_ehash_bucket *inet_ehash_bucket(

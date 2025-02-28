@@ -741,6 +741,8 @@ int inet_csk_listen_start(struct sock *sk, int backlog)
 	struct inet_sock *inet = inet_sk(sk);
 	int err = -EADDRINUSE;
 
+	// 计算半连接队列
+	// request_scok 就是半连接的sock
 	reqsk_queue_alloc(&icsk->icsk_accept_queue);
 
 	sk->sk_max_ack_backlog = backlog;
@@ -753,10 +755,13 @@ int inet_csk_listen_start(struct sock *sk, int backlog)
 	 * after validation is complete.
 	 */
 	sk_state_store(sk, TCP_LISTEN);
+	// 端口检测
 	if (!sk->sk_prot->get_port(sk, inet->inet_num)) {
 		inet->inet_sport = htons(inet->inet_num);
 
 		sk_dst_reset(sk);
+		//存入hash
+		// listening_hash
 		err = sk->sk_prot->hash(sk);
 
 		if (likely(!err))
