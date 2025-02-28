@@ -308,7 +308,7 @@ lookup_protocol:
 	    !ns_capable(net->user_ns, CAP_NET_RAW))
 		goto out_rcu_unlock;
 
-	// 赋值为 协议的ops
+	// 赋值 协议的操作函数集ops
 	sock->ops = answer->ops;
 	// 协议的实现
 	answer_prot = answer->prot;
@@ -456,6 +456,7 @@ int inet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 			goto out;
 	}
 
+	// 用于检查addr
 	tb_id = l3mdev_fib_table_by_index(net, sk->sk_bound_dev_if) ? : tb_id;
 	chk_addr_ret = inet_addr_type_table(net, addr->sin_addr.s_addr, tb_id);
 
@@ -496,10 +497,12 @@ int inet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 		goto out_release_sock;
 
 	inet->inet_rcv_saddr = inet->inet_saddr = addr->sin_addr.s_addr;
+	// 组播 广播
 	if (chk_addr_ret == RTN_MULTICAST || chk_addr_ret == RTN_BROADCAST)
 		inet->inet_saddr = 0;  /* Use device */
 
 	/* Make sure we are allowed to bind here. */
+	// 检测端口是否bind
 	if ((snum || !inet->bind_address_no_port) &&
 	    sk->sk_prot->get_port(sk, snum)) {
 		inet->inet_saddr = inet->inet_rcv_saddr = 0;
