@@ -272,6 +272,7 @@ static int inet_csk_wait_for_connect(struct sock *sk, long timeo)
 					  TASK_INTERRUPTIBLE);
 		release_sock(sk);
 		if (reqsk_queue_empty(&icsk->icsk_accept_queue))
+		// schedule使得当前线程休眠直到某个调度点到来
 			timeo = schedule_timeout(timeo);
 		sched_annotate_sleep();
 		lock_sock(sk);
@@ -307,7 +308,7 @@ struct sock *inet_csk_accept(struct sock *sk, int flags, int *err)
 
 	/* We need to make sure that this socket is listening,
 	 * and that it has something pending.
-	 */
+	 */ 
 	error = -EINVAL;
 	if (sk->sk_state != TCP_LISTEN)
 		goto out_err;
@@ -321,10 +322,12 @@ struct sock *inet_csk_accept(struct sock *sk, int flags, int *err)
 		if (!timeo)
 			goto out_err;
 
+			// 等待
 		error = inet_csk_wait_for_connect(sk, timeo);
 		if (error)
 			goto out_err;
 	}
+	// 取出request_sock
 	req = reqsk_queue_remove(queue, sk);
 	newsk = req->sk;
 
@@ -345,6 +348,8 @@ struct sock *inet_csk_accept(struct sock *sk, int flags, int *err)
 	}
 out:
 	release_sock(sk);
+	//释放请求控制块
+	// req 的sk只是个指针
 	if (req)
 		reqsk_put(req);
 	return newsk;
@@ -776,7 +781,7 @@ EXPORT_SYMBOL_GPL(inet_csk_listen_start);
 static void inet_child_forget(struct sock *sk, struct request_sock *req,
 			      struct sock *child)
 {
-	sk->sk_prot->disconnect(child, O_NONBLOCK);
+	sk->sk_prot->disconnect(child, O_NONBLOCK); 
 
 	sock_orphan(child);
 

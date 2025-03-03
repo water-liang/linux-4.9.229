@@ -165,7 +165,7 @@ struct request_sock_queue {
 	u8			rskq_defer_accept;
 
 	u32			synflood_warned;
-	atomic_t		qlen;
+	atomic_t		qlen;	//半连接数量
 	atomic_t		young;
 
 	struct request_sock	*rskq_accept_head;
