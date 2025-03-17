@@ -348,6 +348,7 @@ lookup_protocol:
 	inet->inet_id = 0;
 
 	// sk被赋值给sock
+	// 等待队列
 	sock_init_data(sock, sk);
 
 	sk->sk_destruct	   = inet_sock_destruct;
@@ -603,6 +604,7 @@ int __inet_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 		if (sk->sk_state != TCP_CLOSE)
 			goto out;
 
+			// 三次握手的动作
 		err = sk->sk_prot->connect(sk, uaddr, addr_len);
 		if (err < 0)
 			goto out;
@@ -625,6 +627,7 @@ int __inet_stream_connect(struct socket *sock, struct sockaddr *uaddr,
 				tcp_sk(sk)->fastopen_req->data ? 1 : 0;
 
 		/* Error code is set above */
+		// 等待三次握手完成
 		if (!timeo || !inet_wait_for_connect(sk, timeo, writebias))
 			goto out;
 
