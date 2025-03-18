@@ -122,7 +122,7 @@ struct inet_hashinfo {
 	 *          TCP_ESTABLISHED <= sk->sk_state < TCP_CLOSE
 	 *
 	 */
-	struct inet_ehash_bucket	*ehash;
+	struct inet_ehash_bucket	*ehash;	// establish的hash
 	spinlock_t			*ehash_locks;
 	unsigned int			ehash_mask;
 	unsigned int			ehash_locks_mask;

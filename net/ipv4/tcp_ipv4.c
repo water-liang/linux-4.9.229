@@ -166,6 +166,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	orig_sport = inet->inet_sport;
 	orig_dport = usin->sin_port;
 	fl4 = &inet->cork.fl.u.ip4;
+	// 根据 目标地址，源地址，网络设备接口等参数 获取路由项
 	rt = ip_route_connect(fl4, nexthop, inet->inet_saddr,
 			      RT_CONN_FLAGS(sk), sk->sk_bound_dev_if,
 			      IPPROTO_TCP,
@@ -182,6 +183,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 		return -ENETUNREACH;
 	}
 
+	// 如果没有启用源路由，那么目标地址就是会被赋值为fl4->daddr
 	if (!inet_opt || !inet_opt->opt.srr)
 		daddr = fl4->daddr;
 
@@ -216,12 +218,14 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	 * complete initialization after this.
 	 */
 	tcp_set_state(sk, TCP_SYN_SENT);
+	// 动态选择一个源端口
 	err = inet_hash_connect(&tcp_death_row, sk);
 	if (err)
 		goto failure;
 
 	sk_set_txhash(sk);
 
+	// 由于前面更新了端口，这里我们需要使用ip_route_newports更新一下路由表，并且得到一个新的路由
 	rt = ip_route_newports(fl4, rt, orig_sport, orig_dport,
 			       inet->inet_sport, inet->inet_dport, sk);
 	if (IS_ERR(rt)) {
@@ -230,6 +234,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 		goto failure;
 	}
 	/* OK, now commit destination to socket.  */
+	// tcp报文文分段
 	sk->sk_gso_type = SKB_GSO_TCPV4;
 	sk_setup_caps(sk, &rt->dst);
 
@@ -2409,7 +2414,7 @@ struct proto tcp_prot = {
 	.slab_flags		= SLAB_DESTROY_BY_RCU,
 	.twsk_prot		= &tcp_timewait_sock_ops,
 	.rsk_prot		= &tcp_request_sock_ops,
-	.h.hashinfo		= &tcp_hashinfo,
+	.h.hashinfo		= &tcp_hashinfo,	//全局hash
 	.no_autobind		= true,
 #ifdef CONFIG_COMPAT
 	.compat_setsockopt	= compat_tcp_setsockopt,

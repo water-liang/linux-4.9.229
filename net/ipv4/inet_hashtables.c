@@ -569,10 +569,10 @@ int __inet_hash_connect(struct inet_timewait_death_row *death_row,
 	}
 
 	inet_get_local_port_range(net, &low, &high);
-	high++; /* [32768, 60999] -> [32768, 61000[ */
+	high++; /* [32768, 60999] -> [32768, 61000) */
 	remaining = high - low;
 	if (likely(remaining > 1))
-		remaining &= ~1U;
+		remaining &= ~1U;//去偶数，历史 通常使用奇偶来区分入站和出站流量
 
 	offset = (hint + port_offset) % remaining;
 	/* In first pass we try ports of @low parity.
@@ -581,6 +581,7 @@ int __inet_hash_connect(struct inet_timewait_death_row *death_row,
 	offset &= ~1U;
 other_parity_scan:
 	port = low + offset;
+	// 优先遍历偶数port
 	for (i = 0; i < remaining; i += 2, port += 2) {
 		if (unlikely(port >= high))
 			port -= remaining;
@@ -593,7 +594,9 @@ other_parity_scan:
 		/* Does not bother with rcv_saddr checks, because
 		 * the established check is already unique enough.
 		 */
+		// 查找bind hash表
 		inet_bind_bucket_for_each(tb, &head->chain) {
+			// 如果可以复用，那么我们尝试去查找这个端口是否有已经建立的连接，如果没有，那么就可以使用这个端口
 			if (net_eq(ib_net(tb), net) && tb->port == port) {
 				if (tb->fastreuse >= 0 ||
 				    tb->fastreuseport >= 0)
@@ -605,7 +608,7 @@ other_parity_scan:
 				goto next_port;
 			}
 		}
-
+		// 如果我们没有在哈希表中找到我们的端口，那么很幸运，没有遇到冲突问题，我们可以直接创建一个新的元素在这个哈希表
 		tb = inet_bind_bucket_create(hinfo->bind_bucket_cachep,
 					     net, head, port);
 		if (!tb) {
@@ -630,6 +633,7 @@ ok:
 	hint += i + 2;
 
 	/* Head lock still held and bh's disabled */
+	// 将 sock 绑定到哈希表
 	inet_bind_hash(sk, tb, port);
 	if (sk_unhashed(sk)) {
 		inet_sk(sk)->inet_sport = htons(port);
@@ -652,6 +656,7 @@ int inet_hash_connect(struct inet_timewait_death_row *death_row,
 {
 	u32 port_offset = 0;
 
+	// 如果未绑定端口（inet_num == 0），计算端口偏移量
 	if (!inet_sk(sk)->inet_num)
 		port_offset = inet_sk_port_offset(sk);
 	return __inet_hash_connect(death_row, sk, port_offset,
