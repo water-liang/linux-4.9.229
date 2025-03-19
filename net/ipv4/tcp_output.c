@@ -402,14 +402,15 @@ static void tcp_init_nondata_skb(struct sk_buff *skb, u32 seq, u8 flags)
 	skb->csum = 0;
 
 	TCP_SKB_CB(skb)->tcp_flags = flags;
-	TCP_SKB_CB(skb)->sacked = 0;
+	TCP_SKB_CB(skb)->sacked = 0;// SACK 选择性确认
 
 	tcp_skb_pcount_set(skb, 1);
 
+	// seq的赋值
 	TCP_SKB_CB(skb)->seq = seq;
 	if (flags & (TCPHDR_SYN | TCPHDR_FIN))
 		seq++;
-	TCP_SKB_CB(skb)->end_seq = seq;
+	TCP_SKB_CB(skb)->end_seq = seq;// 结束seq
 }
 
 static inline bool tcp_urg_mode(const struct tcp_sock *tp)
@@ -3298,12 +3299,12 @@ static void tcp_connect_init(struct sock *sk)
 static void tcp_connect_queue_skb(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
-	struct tcp_skb_cb *tcb = TCP_SKB_CB(skb);
+	struct tcp_skb_cb *tcb = TCP_SKB_CB(skb);// tcp的一些控制信息
 
 	tcb->end_seq += skb->len;
 	__skb_header_release(skb);
-	__tcp_add_write_queue_tail(sk, skb);
-	sk->sk_wmem_queued += skb->truesize;
+	__tcp_add_write_queue_tail(sk, skb);//加入发送队列
+	sk->sk_wmem_queued += skb->truesize;// 记录大小
 	sk_mem_charge(sk, skb->truesize);
 	tp->write_seq = tcb->end_seq;
 	tp->packets_out += tcp_skb_pcount(skb);
@@ -3411,15 +3412,17 @@ done:
 }
 
 /* Build a SYN and send it off. */
-int tcp_connect(struct sock *sk)
+int  tcp_connect(struct sock *sk)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct sk_buff *buff;
 	int err;
 
+	// 更新sk的头部信息
 	if (inet_csk(sk)->icsk_af_ops->rebuild_header(sk))
 		return -EHOSTUNREACH; /* Routing failure or similar. */
 
+	// sk的初始化
 	tcp_connect_init(sk);
 
 	if (unlikely(tp->repair)) {
@@ -3431,14 +3434,16 @@ int tcp_connect(struct sock *sk)
 	if (unlikely(!buff))
 		return -ENOBUFS;
 
+		//sk_buff 初始化
+		// 此处seq +1 
 	tcp_init_nondata_skb(buff, tp->write_seq++, TCPHDR_SYN);
-	tp->retrans_stamp = tcp_time_stamp;
+	tp->retrans_stamp = tcp_time_stamp;	// 重传的时间戳
 	tcp_connect_queue_skb(sk, buff);
-	tcp_ecn_send_syn(sk, buff);
+	tcp_ecn_send_syn(sk, buff); // 显式拥塞通知ECN
 
 	/* Send off SYN; include data in Fast Open. */
 	err = tp->fastopen_req ? tcp_send_syn_data(sk, buff) :
-	      tcp_transmit_skb(sk, buff, 1, sk->sk_allocation);
+	      tcp_transmit_skb(sk, buff, 1, sk->sk_allocation);// 发送
 	if (err == -ECONNREFUSED)
 		return err;
 
@@ -3454,6 +3459,7 @@ int tcp_connect(struct sock *sk)
 	}
 	TCP_INC_STATS(sock_net(sk), TCP_MIB_ACTIVEOPENS);
 
+	// 重传定时器
 	/* Timer for repeating the SYN until an answer. */
 	inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS,
 				  inet_csk(sk)->icsk_rto, TCP_RTO_MAX);

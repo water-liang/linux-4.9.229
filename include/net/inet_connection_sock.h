@@ -91,7 +91,7 @@ struct inet_connection_sock {
 	/* inet_sock has to be the first member! */
 	struct inet_sock	  icsk_inet;
 	struct request_sock_queue icsk_accept_queue;	/* 半连接和全连接数据记录。 */
-	struct inet_bind_bucket	  *icsk_bind_hash;
+	struct inet_bind_bucket	  *icsk_bind_hash;	//bhash的hash 桶
 	unsigned long		  icsk_timeout;
  	struct timer_list	  icsk_retransmit_timer;
  	struct timer_list	  icsk_delack_timer;
@@ -103,7 +103,7 @@ struct inet_connection_sock {
 	__u8			  icsk_ca_state:6,
 				  icsk_ca_setsockopt:1,
 				  icsk_ca_dst_locked:1;
-	__u8			  icsk_retransmits;
+	__u8			  icsk_retransmits;//记录 TCP 数据包的重传次数
 	__u8			  icsk_pending;
 	__u8			  icsk_backoff;
 	__u8			  icsk_syn_retries;
@@ -234,8 +234,8 @@ static inline void inet_csk_reset_xmit_timer(struct sock *sk, const int what,
 
 	if (what == ICSK_TIME_RETRANS || what == ICSK_TIME_PROBE0 ||
 	    what == ICSK_TIME_EARLY_RETRANS || what ==  ICSK_TIME_LOSS_PROBE) {
-		icsk->icsk_pending = what;
-		icsk->icsk_timeout = jiffies + when;
+		icsk->icsk_pending = what;//将事件记录到icsk_pending中表示启动的定时器是超时重传定时器
+		icsk->icsk_timeout = jiffies + when; //设置重传的时间
 		sk_reset_timer(sk, &icsk->icsk_retransmit_timer, icsk->icsk_timeout);
 	} else if (what == ICSK_TIME_DACK) {
 		icsk->icsk_ack.pending |= ICSK_ACK_TIMER;

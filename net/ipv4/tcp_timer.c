@@ -228,9 +228,9 @@ static int tcp_write_timeout(struct sock *sk)
 						      LINUX_MIB_TCPFASTOPENACTIVEFAIL);
 			}
 			/* Black hole detection */
-			tcp_mtu_probing(icsk, sk);
+			tcp_mtu_probing(icsk, sk);  // mtu 探测 如果开启tcp_mtu_probing(默认关闭)了，则执行PMTU
 
-			dst_negative_advice(sk);
+			dst_negative_advice(sk);  // 更新路由缓存
 		} else {
 			sk_rethink_txhash(sk);
 		}
@@ -243,7 +243,7 @@ static int tcp_write_timeout(struct sock *sk)
 			do_reset = alive ||
 				!retransmits_timed_out(sk, retry_until, 0, 0);
 
-			if (tcp_out_of_resources(sk, do_reset))
+			if (tcp_out_of_resources(sk, do_reset)) 
 				return 1;
 		}
 	}
@@ -251,7 +251,7 @@ static int tcp_write_timeout(struct sock *sk)
 	if (retransmits_timed_out(sk, retry_until,
 				  syn_set ? 0 : icsk->icsk_user_timeout, syn_set)) {
 		/* Has it gone just too far? */
-		tcp_write_err(sk);
+		tcp_write_err(sk); // 调用tcp_done关闭TCP流
 		return 1;
 	}
 	return 0;
@@ -443,7 +443,8 @@ void tcp_retransmit_timer(struct sock *sk)
 	WARN_ON(tcp_write_queue_empty(sk));
 
 	tp->tlp_high_seq = 0;
-
+	//发送窗口为0；socket没有关闭；当前不再三次握手阶段（说明在连接态）。
+	//这种情况下发生了超时，需要检查是否需要关闭套接字
 	if (!tp->snd_wnd && !sock_flag(sk, SOCK_DEAD) &&
 	    !((1 << sk->sk_state) & (TCPF_SYN_SENT | TCPF_SYN_RECV))) {
 		/* Receiver dastardly shrinks window. Our retransmits
@@ -468,20 +469,28 @@ void tcp_retransmit_timer(struct sock *sk)
 					    tp->snd_una, tp->snd_nxt);
 		}
 #endif
+		//如果这条连接上已经有很长时间（超过TCP_RTO_MAX=120s)没有收到对端
+		//的确认了，认为连接异常了，直接关闭该套接字
 		if (tcp_time_stamp - tp->rcv_tstamp > TCP_RTO_MAX) {
 			tcp_write_err(sk);
 			goto out;
 		}
+		// 这种情况说明对方已经很拥塞了，进入LOSS状态
 		tcp_enter_loss(sk);
+		// 重传第一包数据
 		tcp_retransmit_skb(sk, tcp_write_queue_head(sk), 1);
+		// 清理路由，因为路由可能也是有问题的
 		__sk_dst_reset(sk);
 		goto out_reset_timer;
 	}
 
 	__NET_INC_STATS(sock_net(sk), LINUX_MIB_TCPTIMEOUTS);
+	// 超时判断处理
+	// 超时重传也不能无限重传下去，必须有截止时间，该函数判断是否继续执行超时重传
 	if (tcp_write_timeout(sk))
 		goto out;
 
+		// 如果是第一次超时重传
 	if (icsk->icsk_retransmits == 0) {
 		int mib_idx = 0;
 
@@ -505,12 +514,14 @@ void tcp_retransmit_timer(struct sock *sk)
 
 	tcp_enter_loss(sk);
 
+	// 重传skb(sk_buff)
 	if (tcp_retransmit_skb(sk, tcp_write_queue_head(sk), 1) > 0) {
 		/* Retransmission failed because of local congestion,
 		 * do not backoff.
 		 */
 		if (!icsk->icsk_retransmits)
 			icsk->icsk_retransmits = 1;
+			// 重启定时器
 		inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS,
 					  min(icsk->icsk_rto, TCP_RESOURCE_PROBE_INTERVAL),
 					  TCP_RTO_MAX);
@@ -556,6 +567,7 @@ out_reset_timer:
 		icsk->icsk_rto = min(icsk->icsk_rto << 1, TCP_RTO_MAX);
 	}
 	inet_csk_reset_xmit_timer(sk, ICSK_TIME_RETRANS, icsk->icsk_rto, TCP_RTO_MAX);
+	//  在 TCP 发生超时重传超过 tcp_retries1 + 1 次后，清除 socket 的 sk_dst_cache，强制 TCP 重新查找路由
 	if (retransmits_timed_out(sk, net->ipv4.sysctl_tcp_retries1 + 1, 0, 0))
 		__sk_dst_reset(sk);
 

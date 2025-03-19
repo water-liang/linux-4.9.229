@@ -238,6 +238,7 @@ int tcp_v4_connect(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	sk->sk_gso_type = SKB_GSO_TCPV4;
 	sk_setup_caps(sk, &rt->dst);
 
+	// 生成一个新的序列号
 	if (!tp->write_seq && likely(!tp->repair))
 		tp->write_seq = secure_tcp_sequence_number(inet->inet_saddr,
 							   inet->inet_daddr,

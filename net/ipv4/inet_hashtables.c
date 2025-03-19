@@ -602,6 +602,9 @@ other_parity_scan:
 				    tb->fastreuseport >= 0)
 					goto next_port;
 				WARN_ON(hlist_empty(&tb->owners));
+				// 检查端口号是否可用 查看ehash表中是否有已经建立的连接
+				// TW为 time-wait状态的连接
+				// tw的port是否满足复用条件
 				if (!check_established(death_row, sk,
 						       port, &tw))
 					goto ok;
@@ -633,10 +636,12 @@ ok:
 	hint += i + 2;
 
 	/* Head lock still held and bh's disabled */
-	// 将 sock 绑定到哈希表
+	// 将 sock 绑定到bhash哈希表
 	inet_bind_hash(sk, tb, port);
+	// 检测有没有加入ehash，在bhash检测时，如果port没有冲突，会走到这部分，此时可以直接加入到ehash中。
 	if (sk_unhashed(sk)) {
 		inet_sk(sk)->inet_sport = htons(port);
+		//将sk插到ehash中，同时删除冲突的osk
 		inet_ehash_nolisten(sk, (struct sock *)tw);
 	}
 	if (tw)

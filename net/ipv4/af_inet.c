@@ -381,7 +381,7 @@ lookup_protocol:
 	}
 
 	// 协议init
-	// 赋值 地址族相关的函数 ex:ipv4
+	// 赋值 地址族相关的函数 ex:tcp
 	if (sk->sk_prot->init) {
 		err = sk->sk_prot->init(sk);
 		if (err)

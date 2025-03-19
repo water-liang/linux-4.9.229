@@ -384,7 +384,7 @@ struct sock {
 	atomic_t		sk_wmem_alloc;
 	atomic_t		sk_omem_alloc;
 	int			sk_sndbuf;
-	struct sk_buff_head	sk_write_queue;
+	struct sk_buff_head	sk_write_queue;// 发送缓冲队列
 
 	/*
 	 * Because of non atomicity rules, all
@@ -400,8 +400,8 @@ struct sock {
 #define SK_PROTOCOL_MAX U8_MAX
 	kmemcheck_bitfield_end(flags);
 
-	int			sk_wmem_queued;
-	gfp_t			sk_allocation;
+	int			sk_wmem_queued;	//发送队列的已经使用的内存大小
+	gfp_t			sk_allocation; // 申请的flag
 	u32			sk_pacing_rate; /* bytes per second */
 	u32			sk_max_pacing_rate;
 	netdev_features_t	sk_route_caps;
