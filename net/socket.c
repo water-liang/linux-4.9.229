@@ -441,6 +441,7 @@ static int sock_map_fd(struct socket *sock, int flags)
 		return fd;
 
 	// sock 和file 相关联
+	// 赋值sock的file ops
 	newfile = sock_alloc_file(sock, flags, NULL);
 	if (likely(!IS_ERR(newfile))) {
 		// 将file和fd关联

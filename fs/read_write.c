@@ -490,8 +490,8 @@ EXPORT_SYMBOL(vfs_read);
 static ssize_t new_sync_write(struct file *filp, const char __user *buf, size_t len, loff_t *ppos)
 {
 	struct iovec iov = { .iov_base = (void __user *)buf, .iov_len = len };
-	struct kiocb kiocb;
-	struct iov_iter iter;
+	struct kiocb kiocb;	//IO操作的行为状态
+	struct iov_iter iter; //IO操作的数据状态
 	ssize_t ret;
 
 	init_sync_kiocb(&kiocb, filp);
@@ -554,6 +554,7 @@ ssize_t vfs_write(struct file *file, const char __user *buf, size_t count, loff_
 	if (unlikely(!access_ok(VERIFY_READ, buf, count)))
 		return -EFAULT;
 
+		// 权限检查函数
 	ret = rw_verify_area(WRITE, file, pos, count);
 	if (!ret) {
 		if (count > MAX_RW_COUNT)
@@ -606,6 +607,7 @@ SYSCALL_DEFINE3(write, unsigned int, fd, const char __user *, buf,
 	ssize_t ret = -EBADF;
 
 	if (f.file) {
+		// 文件位置
 		loff_t pos = file_pos_read(f.file);
 		ret = vfs_write(f.file, buf, count, &pos);
 		if (ret >= 0)
