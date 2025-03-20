@@ -628,6 +628,7 @@ static void reqsk_queue_hash_req(struct request_sock *req,
 			    (unsigned long)req);
 	mod_timer(&req->rsk_timer, jiffies + timeout);
 
+	// 加入ehash表
 	inet_ehash_insert(req_to_sk(req), NULL);
 	/* before letting lookups find us, make sure all req fields
 	 * are committed to memory and refcnt initialized.
@@ -640,6 +641,7 @@ void inet_csk_reqsk_queue_hash_add(struct sock *sk, struct request_sock *req,
 				   unsigned long timeout)
 {
 	reqsk_queue_hash_req(req, timeout);
+	// 队列长度增加
 	inet_csk_reqsk_queue_added(sk);
 }
 EXPORT_SYMBOL_GPL(inet_csk_reqsk_queue_hash_add);

@@ -5652,6 +5652,7 @@ void tcp_finish_connect(struct sock *sk, struct sk_buff *skb)
 	struct tcp_sock *tp = tcp_sk(sk);
 	struct inet_connection_sock *icsk = inet_csk(sk);
 
+	// 设置sk状态为TCP_ESTABLISHED
 	tcp_set_state(sk, TCP_ESTABLISHED);
 	icsk->icsk_ack.lrcvtime = tcp_time_stamp;
 
@@ -5756,6 +5757,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 	if (tp->rx_opt.saw_tstamp && tp->rx_opt.rcv_tsecr)
 		tp->rx_opt.rcv_tsecr -= tp->tsoffset;
 
+		// SYN-ACK的主逻辑
 	if (th->ack) {
 		/* rfc793:
 		 * "If the state is SYN-SENT then
@@ -5821,6 +5823,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 		/* RFC1323: The window in SYN & SYN/ACK segments is
 		 * never scaled.
 		 */
+		// 发送窗口大小改为对端控制
 		tp->snd_wnd = ntohs(th->window);
 
 		if (!tp->rx_opt.wscale_ok) {
@@ -5841,7 +5844,9 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 		if (tcp_is_sack(tp) && sysctl_tcp_fack)
 			tcp_enable_fack(tp);
 
+			// mtu探测
 		tcp_mtup_init(sk);
+		// mss设置
 		tcp_sync_mss(sk, icsk->icsk_pmtu_cookie);
 		tcp_initialize_rcv_mss(sk);
 
@@ -5852,6 +5857,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 
 		smp_mb();
 
+		// sk状态
 		tcp_finish_connect(sk, skb);
 
 		fastopen_fail = (tp->syn_fastopen || tp->syn_data) &&
@@ -5875,13 +5881,16 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 			 */
 			inet_csk_schedule_ack(sk);
 			tcp_enter_quickack_mode(sk, TCP_MAX_QUICKACKS);
+			// 延迟发送ack
 			inet_csk_reset_xmit_timer(sk, ICSK_TIME_DACK,
 						  TCP_DELACK_MAX, TCP_RTO_MAX);
 
 discard:
+			// 释放skb
 			tcp_drop(sk, skb);
 			return 0;
 		} else {
+			// 发送ack
 			tcp_send_ack(sk);
 		}
 		return -1;
@@ -6070,6 +6079,7 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 		} else {
 			/* Make sure socket is routed, for correct metrics. */
 			icsk->icsk_af_ops->rebuild_header(sk);
+			// 拥塞控制
 			tcp_init_congestion_control(sk);
 
 			tcp_mtup_init(sk);
@@ -6077,6 +6087,7 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 			tcp_init_buffer_space(sk);
 		}
 		smp_mb();
+		//设置sock状态
 		tcp_set_state(sk, TCP_ESTABLISHED);
 		sk->sk_state_change(sk);
 
@@ -6087,6 +6098,7 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 		if (sk->sk_socket)
 			sk_wake_async(sk, SOCK_WAKE_IO, POLL_OUT);
 
+			// 滑动窗口
 		tp->snd_una = TCP_SKB_CB(skb)->ack_seq;
 		tp->snd_wnd = ntohs(th->window) << tp->rx_opt.snd_wscale;
 		tcp_init_wl(tp, TCP_SKB_CB(skb)->seq);
@@ -6324,7 +6336,7 @@ struct request_sock *inet_reqsk_alloc(const struct request_sock_ops *ops,
 		ireq->pktopts = NULL;
 #endif
 		atomic64_set(&ireq->ir_cookie, 0);
-		ireq->ireq_state = TCP_NEW_SYN_RECV;
+		ireq->ireq_state = TCP_NEW_SYN_RECV; 
 		write_pnet(&ireq->ireq_net, sock_net(sk_listener));
 		ireq->ireq_family = sk_listener->sk_family;
 	}
@@ -6411,6 +6423,8 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 		goto drop;
 	}
 
+	// 创建一个request_sock
+	// 设置req_sk的状态为TCP_NEW_SYN_RECV
 	req = inet_reqsk_alloc(rsk_ops, sk, !want_cookie);
 	if (!req)
 		goto drop;
@@ -6518,7 +6532,9 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 	} else {
 		tcp_rsk(req)->tfo_listener = false;
 		if (!want_cookie)
-			inet_csk_reqsk_queue_hash_add(sk, req, TCP_TIMEOUT_INIT);
+			inet_csk_reqsk_queue_hash_add(sk, req, TCP_TIMEOUT_INIT);// 加入半连接队列、队列长度+1
+			
+		// 发送synack
 		af_ops->send_synack(sk, dst, &fl, req, &foc,
 				    !want_cookie ? TCP_SYNACK_NORMAL :
 						   TCP_SYNACK_COOKIE);

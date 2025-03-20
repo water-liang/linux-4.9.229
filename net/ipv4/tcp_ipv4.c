@@ -861,12 +861,14 @@ static int tcp_v4_send_synack(const struct sock *sk, struct dst_entry *dst,
 	if (!dst && (dst = inet_csk_route_req(sk, &fl4, req)) == NULL)
 		return -1;
 
+		//
 	skb = tcp_make_synack(sk, dst, req, foc, synack_type);
 
 	if (skb) {
 		__tcp_v4_send_check(skb, ireq->ir_loc_addr, ireq->ir_rmt_addr);
 
 		rcu_read_lock();
+		// 发送
 		err = ip_build_and_send_pkt(skb, sk, ireq->ir_loc_addr,
 					    ireq->ir_rmt_addr,
 					    rcu_dereference(ireq->ireq_opt));
@@ -1617,10 +1619,12 @@ int tcp_v4_rcv(struct sk_buff *skb)
 	if (!pskb_may_pull(skb, sizeof(struct tcphdr)))
 		goto discard_it;
 
+		// 将data转为tcp头部
 	th = (const struct tcphdr *)skb->data;
 
 	if (unlikely(th->doff < sizeof(struct tcphdr) / 4))
 		goto bad_packet;
+		// 确保 TCP 头部可用
 	if (!pskb_may_pull(skb, th->doff * 4))
 		goto discard_it;
 
@@ -1651,6 +1655,9 @@ int tcp_v4_rcv(struct sk_buff *skb)
 	TCP_SKB_CB(skb)->sacked	 = 0;
 
 lookup:
+	// 在全局的hash中查找sk
+	// 先查找ehash
+	// 在查找listen hash
 	sk = __inet_lookup_skb(&tcp_hashinfo, skb, __tcp_hdrlen(th), th->source,
 			       th->dest, &refcounted);
 	if (!sk)
@@ -1729,6 +1736,7 @@ process:
 	tcp_segs_in(tcp_sk(sk), skb);
 	ret = 0;
 	if (!sock_owned_by_user(sk)) {
+		//  TCP 预队列
 		if (!tcp_prequeue(sk, skb))
 			ret = tcp_v4_do_rcv(sk, skb);
 	} else if (tcp_add_backlog(sk, skb)) {
