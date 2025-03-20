@@ -174,7 +174,7 @@ out:
 	return error;
 }
 
-SYSCALL_DEFINE3(test, char __user *, str, int, count)
+SYSCALL_DEFINE2(test, char __user *, str, int, count)
 {
     int ret = 0;
     char buffer[256] = {0};
