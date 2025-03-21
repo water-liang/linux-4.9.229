@@ -1155,6 +1155,7 @@ int tcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 	}
 
 	sockc.tsflags = sk->sk_tsflags;
+	// msg 控制信息的处理
 	if (msg->msg_controllen) {
 		err = sock_cmsg_send(sk, msg, &sockc);
 		if (unlikely(err)) {
@@ -1164,6 +1165,7 @@ int tcp_sendmsg(struct sock *sk, struct msghdr *msg, size_t size)
 	}
 
 	/* This should be in poll */
+	// 清除表示异步情况下套接口发送队列已满的标志
 	sk_clear_bit(SOCKWQ_ASYNC_NOSPACE, sk);
 
 	/* Ok commence sending. */
@@ -1178,17 +1180,22 @@ restart:
 
 	sg = !!(sk->sk_route_caps & NETIF_F_SG);
 
+	// msg中buff的大小
 	while (msg_data_left(msg)) {
 		int copy = 0;
 		int max = size_goal;
 
+		// 从发送队列尾部读取skb
+		// 最后一个报文段可能不是最大报文段，需要追加数据，使该报文段构成一个最大报文段)
 		skb = tcp_write_queue_tail(sk);
 		if (tcp_send_head(sk)) {
-			if (skb->ip_summed == CHECKSUM_NONE)
+			if (skb->ip_summed == CHECKSUM_NONE)//CHECKSUM_NONE 网卡不支持校验和
 				max = mss_now;
-			copy = max - skb->len;
+			copy = max - skb->len;	//  此skb可追加的数据长度，就是通过目前这个skb还可以发送多少数据
 		}
 
+		// skb中没有可用空间了
+		// 创建新的SKB
 		if (copy <= 0 || !tcp_skb_can_collapse_to(skb)) {
 			bool first_skb;
 
@@ -1196,6 +1203,7 @@ new_segment:
 			/* Allocate new segment. If the interface is SG,
 			 * allocate skb fitting to single page.
 			 */
+			// 来判断是否还有空间来供我们分配，如果没有则跳到wait_for_sndbuf来等待buf的释放
 			if (!sk_stream_memory_free(sk))
 				goto wait_for_sndbuf;
 
@@ -1218,6 +1226,7 @@ new_segment:
 			if (sk_check_csum_caps(sk))
 				skb->ip_summed = CHECKSUM_PARTIAL;
 
+				// 加入发送队列
 			skb_entail(sk, skb);
 			copy = size_goal;
 			max = size_goal;
@@ -1235,13 +1244,18 @@ new_segment:
 			copy = msg_data_left(msg);
 
 		/* Where to copy to? */
+		// skb线性区域空间
+		// 如果skb的线性数据区还有剩余空间，就先复制到线性数据区
 		if (skb_availroom(skb) > 0) {
 			/* We have some space in skb head. Superb! */
 			copy = min_t(int, copy, skb_availroom(skb));
+			// 仅仅拷贝空间能放下的部分，拷贝用户空间的数据到内核空间
 			err = skb_add_data_nocache(sk, skb, &msg->msg_iter, copy);
 			if (err)
 				goto do_fault;
 		} else {
+			// 如果skb的线性数据区已经用完了，那么就使用分页区 
+			// 分散聚合
 			bool merge = true;
 			int i = skb_shinfo(skb)->nr_frags;
 			struct page_frag *pfrag = sk_page_frag(sk);
@@ -1284,11 +1298,12 @@ new_segment:
 		if (!copied)
 			TCP_SKB_CB(skb)->tcp_flags &= ~TCPHDR_PSH;
 
+			 /* 更新发送队列的最后一个序号 */
 		tp->write_seq += copy;
 		TCP_SKB_CB(skb)->end_seq += copy;
 		tcp_skb_pcount_set(skb, 0);
 
-		copied += copy;
+		copied += copy; // 已经拷贝到发送队列的数据量
 		if (!msg_data_left(msg)) {
 			if (unlikely(flags & MSG_EOR))
 				TCP_SKB_CB(skb)->eor = 1;
@@ -1298,11 +1313,14 @@ new_segment:
 		if (skb->len < max || (flags & MSG_OOB) || unlikely(tp->repair))
 			continue;
 
+				// 如果需要设置PSH标志 
+				// 未发送的数据数据是否已经超过最大窗口的一半
 		if (forced_push(tp)) {
 			tcp_mark_push(tp, skb);
+			// 尽可能的将发送队列中的skb发送出去，禁用nalge
 			__tcp_push_pending_frames(sk, mss_now, TCP_NAGLE_PUSH);
 		} else if (skb == tcp_send_head(sk))
-			tcp_push_one(sk, mss_now);
+			tcp_push_one(sk, mss_now); //第一个数据包 只发送一个skb
 		continue;
 
 wait_for_sndbuf:
@@ -1320,6 +1338,7 @@ wait_for_memory:
 	}
 
 out:
+// 如果已经有数据复制到发送队列了，就尝试立即发送 
 	if (copied) {
 		tcp_tx_timestamp(sk, sockc.tsflags, tcp_write_queue_tail(sk));
 		tcp_push(sk, flags, mss_now, tp->nonagle, size_goal);

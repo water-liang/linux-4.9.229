@@ -741,6 +741,7 @@ int inet_sendmsg(struct socket *sock, struct msghdr *msg, size_t size)
 {
 	struct sock *sk = sock->sk;
 
+	// RPS功能
 	sock_rps_record_flow(sk);
 
 	/* We may need to bind the socket. */
