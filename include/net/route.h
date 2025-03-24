@@ -49,7 +49,7 @@ struct fib_nh;
 struct fib_info;
 struct uncached_list;
 struct rtable {
-	struct dst_entry	dst;
+	struct dst_entry	dst; //路由
 
 	int			rt_genid;
 	unsigned int		rt_flags;
@@ -57,7 +57,7 @@ struct rtable {
 	__u8			rt_is_input;
 	__u8			rt_uses_gateway;
 
-	int			rt_iif;
+	int			rt_iif;//dev id号
 
 	/* Info on neighbour */
 	__be32			rt_gateway;
@@ -66,7 +66,7 @@ struct rtable {
 	u32			rt_mtu_locked:1,
 				rt_pmtu:31;
 
-	u32			rt_table_id;
+	u32			rt_table_id;	// 路由表
 
 	struct list_head	rt_uncached;
 	struct uncached_list	*rt_uncached_list;

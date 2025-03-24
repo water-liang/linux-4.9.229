@@ -381,7 +381,7 @@ struct sock {
 	struct dst_entry	*sk_rx_dst;
 	struct dst_entry __rcu	*sk_dst_cache;
 	/* Note: 32bit hole on 64bit arches */
-	atomic_t		sk_wmem_alloc;
+	atomic_t		sk_wmem_alloc;	// 提交发送的队里所占用空间
 	atomic_t		sk_omem_alloc;
 	int			sk_sndbuf;
 	struct sk_buff_head	sk_write_queue;// 发送缓冲队列

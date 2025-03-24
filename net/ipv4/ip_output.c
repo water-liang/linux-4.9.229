@@ -397,13 +397,18 @@ static void ip_copy_addrs(struct iphdr *iph, const struct flowi4 *fl4)
 }
 
 /* Note: skb->sk can be different from sk, in case of tunnels */
+/*
+* 1. 选择路由
+* 2. 构建IP头	
+* 3. ip_local_out 发送数据包
+*/
 int ip_queue_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl)
 {
 	struct inet_sock *inet = inet_sk(sk);
 	struct net *net = sock_net(sk);
 	struct ip_options_rcu *inet_opt;
-	struct flowi4 *fl4;
-	struct rtable *rt;
+	struct flowi4 *fl4;	// 路由查找
+	struct rtable *rt;	// 路由表
 	struct iphdr *iph;
 	int res;
 
@@ -411,8 +416,10 @@ int ip_queue_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl)
 	 * f.e. by something like SCTP.
 	 */
 	rcu_read_lock();
+	// 套接字 IP 选项
 	inet_opt = rcu_dereference(inet->inet_opt);
 	fl4 = &fl->u.ip4;
+	// 路由信息
 	rt = skb_rtable(skb);
 	if (rt)
 		goto packet_routed;
