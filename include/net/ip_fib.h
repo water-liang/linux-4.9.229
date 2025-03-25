@@ -307,6 +307,7 @@ static inline int fib_lookup(struct net *net, struct flowi4 *flp,
 	struct fib_table *tb;
 	int err = -ENETUNREACH;
 
+	// 自定义表
 	flags |= FIB_LOOKUP_NOREF;
 	if (net->ipv4.fib_has_custom_rules)
 		return __fib_lookup(net, flp, res, flags);
@@ -315,6 +316,7 @@ static inline int fib_lookup(struct net *net, struct flowi4 *flp,
 
 	res->tclassid = 0;
 
+	// main表
 	tb = rcu_dereference_rtnl(net->ipv4.fib_main);
 	if (tb)
 		err = fib_table_lookup(tb, flp, res, flags);
@@ -322,6 +324,7 @@ static inline int fib_lookup(struct net *net, struct flowi4 *flp,
 	if (!err)
 		goto out;
 
+		// default表
 	tb = rcu_dereference_rtnl(net->ipv4.fib_default);
 	if (tb)
 		err = fib_table_lookup(tb, flp, res, flags);

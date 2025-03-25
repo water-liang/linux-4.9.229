@@ -186,7 +186,7 @@ struct inet_sock {
 #define inet_dport		sk.__sk_common.skc_dport
 #define inet_num		sk.__sk_common.skc_num
 
-	__be32			inet_saddr;
+	__be32			inet_saddr; // 绑定的本地 IPv4 地址 *
 	__s16			uc_ttl;
 	__u16			cmsg_flags;
 	__be16			inet_sport;

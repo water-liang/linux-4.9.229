@@ -419,12 +419,13 @@ int ip_queue_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl)
 	// 套接字 IP 选项
 	inet_opt = rcu_dereference(inet->inet_opt);
 	fl4 = &fl->u.ip4;
-	// 路由信息
+	// 从SKB查找路由信息
 	rt = skb_rtable(skb);
 	if (rt)
 		goto packet_routed;
 
 	/* Make sure we can route this packet. */
+	// 从SK中查询路由表
 	rt = (struct rtable *)__sk_dst_check(sk, 0);
 	if (!rt) {
 		__be32 daddr;
@@ -438,6 +439,7 @@ int ip_queue_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl)
 		 * keep trying until route appears or the connection times
 		 * itself out.
 		 */
+		// 从路由表查找路由项
 		rt = ip_route_output_ports(net, fl4, sk,
 					   daddr, inet->inet_saddr,
 					   inet->inet_dport,
@@ -452,6 +454,7 @@ int ip_queue_xmit(struct sock *sk, struct sk_buff *skb, struct flowi *fl)
 	skb_dst_set_noref(skb, &rt->dst);
 
 packet_routed:
+	// 填充IP头部
 	if (inet_opt && inet_opt->opt.is_strictroute && rt->rt_uses_gateway)
 		goto no_route;
 
@@ -482,6 +485,7 @@ packet_routed:
 	skb->priority = sk->sk_priority;
 	skb->mark = sk->sk_mark;
 
+	// 发送
 	res = ip_local_out(net, sk, skb);
 	rcu_read_unlock();
 	return res;

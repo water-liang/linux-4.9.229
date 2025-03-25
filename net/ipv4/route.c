@@ -2325,6 +2325,7 @@ struct rtable *__ip_route_output_key_hash(struct net *net, struct flowi4 *fl4,
 		goto make_route;
 	}
 
+	//FIB表查询
 	err = fib_lookup(net, fl4, &res, 0);
 	if (err) {
 		res.fi = NULL;
@@ -2381,6 +2382,7 @@ struct rtable *__ip_route_output_key_hash(struct net *net, struct flowi4 *fl4,
 
 
 make_route:
+	// fib 转为 rtable
 	rth = __mkroute_output(&res, fl4, orig_oif, dev_out, flags);
 
 out:
