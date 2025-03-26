@@ -1524,7 +1524,7 @@ struct rtable *rt_dst_alloc(struct net_device *dev,
 		rt->rt_table_id = 0;
 		INIT_LIST_HEAD(&rt->rt_uncached);
 
-		rt->dst.output = ip_output;
+		rt->dst.output = ip_output;// 赋值output
 		if (flags & RTCF_LOCAL)
 			rt->dst.input = ip_local_deliver;
 	}
@@ -2470,6 +2470,7 @@ struct dst_entry *ipv4_blackhole_route(struct net *net, struct dst_entry *dst_or
 struct rtable *ip_route_output_flow(struct net *net, struct flowi4 *flp4,
 				    const struct sock *sk)
 {
+	// 查找路由
 	struct rtable *rt = __ip_route_output_key(net, flp4);
 
 	if (IS_ERR(rt))

@@ -103,6 +103,7 @@ int __ip_local_out(struct net *net, struct sock *sk, struct sk_buff *skb)
 	/* if egress device is enslaved to an L3 master device pass the
 	 * skb to its handler for processing
 	 */
+	// vrf 处理
 	skb = l3mdev_ip_out(sk, skb);
 	if (unlikely(!skb))
 		return 0;
@@ -179,6 +180,7 @@ int ip_build_and_send_pkt(struct sk_buff *skb, const struct sock *sk,
 }
 EXPORT_SYMBOL_GPL(ip_build_and_send_pkt);
 
+// 开始邻居子系统
 static int ip_finish_output2(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
 	struct dst_entry *dst = skb_dst(skb);
@@ -299,6 +301,7 @@ static int ip_finish_output(struct net *net, struct sock *sk, struct sk_buff *sk
 	if (skb_is_gso(skb))
 		return ip_finish_output_gso(net, sk, skb, mtu);
 
+		// 内核层分片
 	if (skb->len > mtu || (IPCB(skb)->flags & IPSKB_FRAG_PMTU))
 		return ip_fragment(net, sk, skb, mtu, ip_finish_output2);
 
@@ -530,6 +533,8 @@ static int ip_fragment(struct net *net, struct sock *sk, struct sk_buff *skb,
 {
 	struct iphdr *iph = ip_hdr(skb);
 
+	// IP_DF 为0 允许分片
+	// frag_off 为分片标志
 	if ((iph->frag_off & htons(IP_DF)) == 0)
 		return ip_do_fragment(net, sk, skb, output);
 
@@ -558,7 +563,7 @@ int ip_do_fragment(struct net *net, struct sock *sk, struct sk_buff *skb,
 {
 	struct iphdr *iph;
 	int ptr;
-	struct sk_buff *skb2;
+	struct sk_buff *skb2; // 指向新的分片
 	unsigned int mtu, hlen, left, len, ll_rs;
 	int offset;
 	__be16 not_last_frag;
@@ -584,7 +589,7 @@ int ip_do_fragment(struct net *net, struct sock *sk, struct sk_buff *skb,
 	 *	Setup starting values.
 	 */
 
-	hlen = iph->ihl * 4;
+	hlen = iph->ihl * 4; // ip头部大小*4
 	mtu = mtu - hlen;	/* Size of data space */
 	IPCB(skb)->flags |= IPSKB_FRAG_COMPLETE;
 
@@ -696,16 +701,19 @@ slow_path_clean:
 slow_path:
 	iph = ip_hdr(skb);
 
-	left = skb->len - hlen;		/* Space per frame */
+	left = skb->len - hlen;		/* Space per frame  ip载荷的大小*/
 	ptr = hlen;		/* Where to start from */
 
+	// 底层驱动使用
 	ll_rs = LL_RESERVED_SPACE(rt->dst.dev);
 
 	/*
 	 *	Fragment the datagram.
 	 */
 
+	 // Fragment Offset 的单位是 8 字节，所以需要乘 8，才能得到实际的偏移量
 	offset = (ntohs(iph->frag_off) & IP_OFFSET) << 3;
+	// MF的标志
 	not_last_frag = iph->frag_off & htons(IP_MF);
 
 	/*
@@ -719,6 +727,10 @@ slow_path:
 			len = mtu;
 		/* IF: we are not sending up to and including the packet end
 		   then align the next start on an eight byte boundary */
+
+		   // 为了8字节对齐
+			// 在 IPv4 分片机制 中，iph->frag_off 分片偏移量的单位是 8 字节
+			// 最后一个分片可以不是 8 字节对齐
 		if (len < left)	{
 			len &= ~7;
 		}
@@ -776,6 +788,7 @@ slow_path:
 		 * on the initial skb, so that all the following fragments
 		 * will inherit fixed options.
 		 */
+		// 第一个分片包
 		if (offset == 0)
 			ip_options_fragment(skb);
 
