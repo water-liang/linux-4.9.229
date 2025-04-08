@@ -2180,7 +2180,10 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 
 	sent_pkts = 0;
 
+	// 数据包不是特别“紧急”，进行mtu他测
+	// TCP的PUSH标志的含义是尽快将数据包发送出去
 	if (!push_one) {
+		// MTU探测
 		/* Do MTU probing. */
 		result = tcp_mtu_probe(sk);
 		if (!result) {
@@ -2190,10 +2193,12 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 		}
 	}
 
+	// 计算TSO分片数，允许的最大分片数
 	max_segs = tcp_tso_segs(sk, mss_now);
 	while ((skb = tcp_send_head(sk))) {
 		unsigned int limit;
 
+		// skb的分段数
 		tso_segs = tcp_init_tso_segs(skb, mss_now);
 		BUG_ON(!tso_segs);
 
@@ -2203,6 +2208,7 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 			goto repair; /* Skip network transmission */
 		}
 
+		// 拥塞窗口的余量
 		cwnd_quota = tcp_cwnd_test(tp, skb);
 		if (!cwnd_quota) {
 			if (push_one == 2)
@@ -2211,16 +2217,18 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 			else
 				break;
 		}
-
+		// 是否在发送窗口范围内
 		if (unlikely(!tcp_snd_wnd_test(tp, skb, mss_now)))
 			break;
 
 		if (tso_segs == 1) {
+			// nagle算法检测
 			if (unlikely(!tcp_nagle_test(tp, skb, mss_now,
 						     (tcp_skb_is_last(sk, skb) ?
 						      nonagle : TCP_NAGLE_PUSH))))
 				break;
 		} else {
+			// 延迟发送检测
 			if (!push_one &&
 			    tcp_tso_should_defer(sk, skb, &is_cwnd_limited,
 						 max_segs))
@@ -2228,6 +2236,7 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 		}
 
 		limit = mss_now;
+		// tcp_mss_split_point返回的是 发送窗口和拥塞窗口允许发送的最大字节数
 		if (tso_segs > 1 && !tcp_urg_mode(tp))
 			limit = tcp_mss_split_point(sk, skb, mss_now,
 						    min_t(unsigned int,
@@ -2235,6 +2244,7 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 							  max_segs),
 						    nonagle);
 
+		// SKB本身的数据量超过了限定值，需要进行分片
 		if (skb->len > limit &&
 		    unlikely(tso_fragment(sk, skb, limit, mss_now, gfp)))
 			break;
@@ -2250,6 +2260,7 @@ static bool tcp_write_xmit(struct sock *sk, unsigned int mss_now, int nonagle,
 		if (TCP_SKB_CB(skb)->end_seq == TCP_SKB_CB(skb)->seq)
 			break;
 
+			// 发送
 		if (unlikely(tcp_transmit_skb(sk, skb, 1, gfp)))
 			break;
 
@@ -2257,6 +2268,7 @@ repair:
 		/* Advance the send_head.  This one is sent out.
 		 * This call will increment packets_out.
 		 */
+		//更新发送队列，更新统计数据
 		tcp_event_new_data_sent(sk, skb);
 
 		tcp_minshall_update(tp, mss_now, skb);
