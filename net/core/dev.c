@@ -2300,8 +2300,11 @@ int netif_get_num_default_rss_queues(void)
 }
 EXPORT_SYMBOL(netif_get_num_default_rss_queues);
 
+
 static void __netif_reschedule(struct Qdisc *q)
 {
+
+	// 将q加入到output_queue_tailp
 	struct softnet_data *sd;
 	unsigned long flags;
 
@@ -2310,14 +2313,14 @@ static void __netif_reschedule(struct Qdisc *q)
 	q->next_sched = NULL;
 	*sd->output_queue_tailp = q;
 	sd->output_queue_tailp = &q->next_sched;
-	raise_softirq_irqoff(NET_TX_SOFTIRQ);
+	raise_softirq_irqoff(NET_TX_SOFTIRQ);//设置软中断标志位
 	local_irq_restore(flags);
 }
 
 void __netif_schedule(struct Qdisc *q)
 {
 	if (!test_and_set_bit(__QDISC_STATE_SCHED, &q->state))
-		__netif_reschedule(q);
+		__netif_reschedule(q);//软中断 重新调度
 }
 EXPORT_SYMBOL(__netif_schedule);
 
@@ -3153,11 +3156,13 @@ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 		spin_lock(&q->busylock);
 
 	spin_lock(root_lock);
+	// qidisc未打开
 	if (unlikely(test_bit(__QDISC_STATE_DEACTIVATED, &q->state))) {
 		__qdisc_drop(skb, &to_free);
 		rc = NET_XMIT_DROP;
 	} else if ((q->flags & TCQ_F_CAN_BYPASS) && !qdisc_qlen(q) &&
 		   qdisc_run_begin(q)) {
+			// bypass 队列为空  开启qidisc
 		/*
 		 * This is a work-conserving queue; there are no old skbs
 		 * waiting to be sent out; and the qdisc is not running -
@@ -3171,6 +3176,7 @@ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 				spin_unlock(&q->busylock);
 				contended = false;
 			}
+			//发送
 			__qdisc_run(q);
 		} else
 			qdisc_run_end(q);
@@ -3429,15 +3435,18 @@ static int __dev_queue_xmit(struct sk_buff *skb, void *accel_priv)
 	else
 		skb_dst_force(skb);
 
+		// 获取网卡设别的发送队列
 	txq = netdev_pick_tx(dev, skb, accel_priv);
 	q = rcu_dereference_bh(txq->qdisc);
 
 	trace_net_dev_queue(skb);
 	if (q->enqueue) {
+		// dev存在txq队列，进行处理
 		rc = __dev_xmit_skb(skb, q, dev, txq);
 		goto out;
 	}
 
+	// loopback tunnels等虚拟网卡设备没有队列
 	/* The device has no queue. Common case for software devices:
 	   loopback, all the sorts of tunnels...
 
@@ -3466,6 +3475,7 @@ static int __dev_queue_xmit(struct sk_buff *skb, void *accel_priv)
 
 			if (!netif_xmit_stopped(txq)) {
 				__this_cpu_inc(xmit_recursion);
+				// 此处进行处理
 				skb = dev_hard_start_xmit(skb, dev, txq, &rc);
 				__this_cpu_dec(xmit_recursion);
 				if (dev_xmit_complete(rc)) {
@@ -3923,6 +3933,7 @@ static __latent_entropy void net_tx_action(struct softirq_action *h)
 {
 	struct softnet_data *sd = this_cpu_ptr(&softnet_data);
 
+	// 完成队列
 	if (sd->completion_queue) {
 		struct sk_buff *clist;
 
@@ -3944,12 +3955,13 @@ static __latent_entropy void net_tx_action(struct softirq_action *h)
 			if (skb->fclone != SKB_FCLONE_UNAVAILABLE)
 				__kfree_skb(skb);
 			else
-				__kfree_skb_defer(skb);
+				__kfree_skb_defer(skb);//延迟释放
 		}
 
 		__kfree_skb_flush();
 	}
 
+	// qdisc发送队列
 	if (sd->output_queue) {
 		struct Qdisc *head;
 
@@ -8457,6 +8469,7 @@ static int __init net_dev_init(void)
 	if (register_pernet_device(&default_device_ops))
 		goto out;
 
+		//网络软中断注册函数
 	open_softirq(NET_TX_SOFTIRQ, net_tx_action);
 	open_softirq(NET_RX_SOFTIRQ, net_rx_action);
 

@@ -84,7 +84,7 @@ struct Qdisc {
 	 * For performance sake on SMP, we put highly modified fields at the end
 	 */
 	struct sk_buff		*gso_skb ____cacheline_aligned_in_smp;
-	struct qdisc_skb_head	q;
+	struct qdisc_skb_head	q;//skb队列
 	struct gnet_stats_basic_packed bstats;
 	seqcount_t		running;
 	struct gnet_stats_queue	qstats;

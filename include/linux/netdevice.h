@@ -559,12 +559,13 @@ enum netdev_queue_state_t {
  * netif_xmit*stopped functions, they should only be using netif_tx_*.
  */
 
+ // 网络设备的队列
 struct netdev_queue {
 /*
  * read-mostly part
  */
 	struct net_device	*dev;
-	struct Qdisc __rcu	*qdisc;
+	struct Qdisc __rcu	*qdisc;	//排队规则
 	struct Qdisc		*qdisc_sleeping;
 #ifdef CONFIG_SYSFS
 	struct kobject		kobj;
@@ -572,7 +573,7 @@ struct netdev_queue {
 #if defined(CONFIG_XPS) && defined(CONFIG_NUMA)
 	int			numa_node;
 #endif
-	unsigned long		tx_maxrate;
+	unsigned long		tx_maxrate;	//发送速率
 	/*
 	 * Number of TX timeouts for this queue
 	 * (/sys/class/net/DEV/Q/trans_timeout)

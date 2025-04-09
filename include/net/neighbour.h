@@ -130,6 +130,7 @@ struct neigh_statistics {
 
 #define NEIGH_CACHE_STAT_INC(tbl, field) this_cpu_inc((tbl)->stats->field)
 
+// 邻居系统的数据结构体
 struct neighbour {
 	struct neighbour __rcu	*next;
 	struct neigh_table	*tbl;
@@ -179,6 +180,7 @@ struct pneigh_entry {
 
 #define NEIGH_NUM_HASH_RND	4
 
+// 包含实际信息
 struct neigh_hash_table {
 	struct neighbour __rcu	**hash_buckets;
 	unsigned int		hash_shift;
@@ -186,11 +188,11 @@ struct neigh_hash_table {
 	struct rcu_head		rcu;
 };
 
-
+// 表示邻居信息的表
 struct neigh_table {
 	int			family;
-	int			entry_size;
-	int			key_len;
+	int			entry_size;// 一个邻居结构的大小
+	int			key_len;	// 哈希key键值长度
 	__be16			protocol;
 	__u32			(*hash)(const void *pkey,
 					const struct net_device *dev,
@@ -452,7 +454,9 @@ static inline int neigh_hh_output(const struct hh_cache *hh, struct sk_buff *skb
 	unsigned int seq;
 	int hh_len;
 
+	//复制mac地址
 	do {
+		//序列锁
 		seq = read_seqbegin(&hh->hh_lock);
 		hh_len = READ_ONCE(hh->hh_len);
 		if (likely(hh_len <= HH_DATA_MOD)) {
@@ -482,6 +486,7 @@ static inline int neigh_hh_output(const struct hh_cache *hh, struct sk_buff *skb
 		return NET_XMIT_DROP;
 	}
 
+	//SKB指针向前移动
 	__skb_push(skb, hh_len);
 	return dev_queue_xmit(skb);
 }

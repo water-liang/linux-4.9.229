@@ -55,6 +55,7 @@ EXPORT_SYMBOL(irq_stat);
 
 static struct softirq_action softirq_vec[NR_SOFTIRQS] __cacheline_aligned_in_smp;
 
+// 每一个cpu上都定义一份
 DEFINE_PER_CPU(struct task_struct *, ksoftirqd);
 
 const char * const softirq_to_name[NR_SOFTIRQS] = {
@@ -262,14 +263,14 @@ asmlinkage __visible void __softirq_entry __do_softirq(void)
 	pending = local_softirq_pending();
 	account_irq_enter_time(current);
 
-	__local_bh_disable_ip(_RET_IP_, SOFTIRQ_OFFSET);
+	__local_bh_disable_ip(_RET_IP_, SOFTIRQ_OFFSET);// 关闭软中断
 	in_hardirq = lockdep_softirq_start();
 
 restart:
 	/* Reset the pending bitmask before enabling irqs */
 	set_softirq_pending(0);
 
-	local_irq_enable();
+	local_irq_enable();//开启硬中断
 
 	h = softirq_vec;
 
@@ -285,7 +286,7 @@ restart:
 		kstat_incr_softirqs_this_cpu(vec_nr);
 
 		trace_softirq_entry(vec_nr);
-		h->action(h);
+		h->action(h);//软中断处理函数
 		trace_softirq_exit(vec_nr);
 		if (unlikely(prev_count != preempt_count())) {
 			pr_err("huh, entered softirq %u %s %p with preempt_count %08x, exited with %08x?\n",
@@ -300,7 +301,7 @@ restart:
 	rcu_bh_qs();
 	local_irq_disable();
 
-	pending = local_softirq_pending();
+	pending = local_softirq_pending();// 还有未处理的软中断
 	if (pending) {
 		if (time_before(jiffies, end) && !need_resched() &&
 		    --max_restart)
@@ -309,7 +310,7 @@ restart:
 		wakeup_softirqd();
 	}
 
-	lockdep_softirq_end(in_hardirq);
+	lockdep_softirq_end(in_hardirq);//关闭硬中断
 	account_irq_exit_time(current);
 	__local_bh_enable(SOFTIRQ_OFFSET);
 	WARN_ON_ONCE(in_interrupt());
@@ -404,9 +405,11 @@ void irq_exit(void)
 #endif
 
 	account_irq_exit_time(current);
+	// 中断上下文结束标志
 	preempt_count_sub(HARDIRQ_OFFSET);
+	//开始处理软中断
 	if (!in_interrupt() && local_softirq_pending())
-		invoke_softirq();
+		invoke_softirq(); 
 
 	tick_irq_exit();
 	rcu_irq_exit();
@@ -672,6 +675,7 @@ static int ksoftirqd_should_run(unsigned int cpu)
 static void run_ksoftirqd(unsigned int cpu)
 {
 	local_irq_disable();
+	// local_softirq_pending 与体系相关
 	if (local_softirq_pending()) {
 		/*
 		 * We can safely run softirq on inline stack, as we are not deep

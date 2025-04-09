@@ -1283,9 +1283,9 @@ struct sk_buff *skb_realloc_headroom(struct sk_buff *skb, unsigned int headroom)
 	int delta = headroom - skb_headroom(skb);
 
 	if (delta <= 0)
-		skb2 = pskb_copy(skb, GFP_ATOMIC);
+		skb2 = pskb_copy(skb, GFP_ATOMIC);// 拷贝线性区域
 	else {
-		skb2 = skb_clone(skb, GFP_ATOMIC);
+		skb2 = skb_clone(skb, GFP_ATOMIC);// 全拷贝
 		if (skb2 && pskb_expand_head(skb2, SKB_DATA_ALIGN(delta), 0,
 					     GFP_ATOMIC)) {
 			kfree_skb(skb2);

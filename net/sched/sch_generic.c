@@ -128,6 +128,7 @@ static struct sk_buff *dequeue_skb(struct Qdisc *q, bool *validate,
 			skb = NULL;
 		return skb;
 	}
+	// bad txq 队列
 	*validate = true;
 	skb = q->skb_bad_txq;
 	if (unlikely(skb)) {
@@ -141,11 +142,13 @@ static struct sk_buff *dequeue_skb(struct Qdisc *q, bool *validate,
 		}
 		return NULL;
 	}
+	// 多发送队列
 	if (!(q->flags & TCQ_F_ONETXQUEUE) ||
 	    !netif_xmit_frozen_or_stopped(txq))
-		skb = q->dequeue(q);
+		skb = q->dequeue(q);//dequeuue取决于qdisc的不同实现
 	if (skb) {
-bulk:
+bulk:	
+		// 批量拉取（dequeue）多个待发送的数据包（skb）
 		if (qdisc_may_bulk(q))
 			try_bulk_dequeue_skb(q, skb, txq, packets);
 		else
@@ -178,6 +181,7 @@ int sch_direct_xmit(struct sk_buff *skb, struct Qdisc *q,
 
 	if (likely(skb)) {
 		HARD_TX_LOCK(dev, txq, smp_processor_id());
+		// 发送不停止
 		if (!netif_xmit_frozen_or_stopped(txq))
 			skb = dev_hard_start_xmit(skb, dev, txq, &ret);
 
@@ -189,9 +193,11 @@ int sch_direct_xmit(struct sk_buff *skb, struct Qdisc *q,
 	spin_lock(root_lock);
 
 	if (dev_xmit_complete(ret)) {
+		// 发送成功
 		/* Driver sent out skb successfully or skb was consumed */
 		ret = qdisc_qlen(q);
 	} else {
+		// 重新入队
 		/* Driver returned NETDEV_TX_BUSY - requeue skb */
 		if (unlikely(ret != NETDEV_TX_BUSY))
 			net_warn_ratelimited("BUG %s code %d qlen %d\n",
@@ -247,7 +253,7 @@ static inline int qdisc_restart(struct Qdisc *q, int *packets)
 
 void __qdisc_run(struct Qdisc *q)
 {
-	int quota = weight_p;
+	int quota = weight_p;//默认64
 	int packets;
 
 	while (qdisc_restart(q, &packets)) {
