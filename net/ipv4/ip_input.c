@@ -191,15 +191,18 @@ bool ip_call_ra_chain(struct sk_buff *skb)
 
 static int ip_local_deliver_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
 {
+	// 去掉ip层头部
 	__skb_pull(skb, skb_network_header_len(skb));
 
 	rcu_read_lock();
 	{
+		// 获取传输层协议
 		int protocol = ip_hdr(skb)->protocol;
 		const struct net_protocol *ipprot;
 		int raw;
 
 	resubmit:
+	//原始套接字
 		raw = raw_local_deliver(skb, protocol);
 
 		ipprot = rcu_dereference(inet_protos[protocol]);
@@ -213,6 +216,7 @@ static int ip_local_deliver_finish(struct net *net, struct sock *sk, struct sk_b
 				}
 				nf_reset(skb);
 			}
+			//对应协议的处理函数
 			ret = ipprot->handler(skb);
 			if (ret < 0) {
 				protocol = -ret;
@@ -249,7 +253,10 @@ int ip_local_deliver(struct sk_buff *skb)
 	 */
 	struct net *net = dev_net(skb->dev);
 
+	// 分片
 	if (ip_is_fragment(ip_hdr(skb))) {
+		// 分片重组
+		// 非0表示数据包不完整，还需要重组，接受流程结束
 		if (ip_defrag(net, skb, IP_DEFRAG_LOCAL_DELIVER))
 			return 0;
 	}
@@ -316,6 +323,7 @@ static int ip_rcv_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
 	/* if ingress device is enslaved to an L3 master device pass the
 	 * skb to its handler for processing
 	 */
+	// VRF 处理
 	skb = l3mdev_ip_rcv(skb);
 	if (!skb)
 		return NET_RX_SUCCESS;
@@ -360,9 +368,11 @@ static int ip_rcv_finish(struct net *net, struct sock *sk, struct sk_buff *skb)
 	}
 #endif
 
+	// 存在 ip options
 	if (iph->ihl > 5 && ip_rcv_options(skb, dev))
 		goto drop;
 
+		//路由表
 	rt = skb_rtable(skb);
 	if (rt->rt_type == RTN_MULTICAST) {
 		__IP_UPD_PO_STATS(net, IPSTATS_MIB_INMCAST, skb->len);
@@ -418,6 +428,7 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, 
 	net = dev_net(dev);
 	__IP_UPD_PO_STATS(net, IPSTATS_MIB_IN, skb->len);
 
+	// skb共享检查
 	skb = skb_share_check(skb, GFP_ATOMIC);
 	if (!skb) {
 		__IP_INC_STATS(net, IPSTATS_MIB_INDISCARDS);
@@ -450,6 +461,7 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, 
 		       IPSTATS_MIB_NOECTPKTS + (iph->tos & INET_ECN_MASK),
 		       max_t(unsigned short, 1, skb_shinfo(skb)->gso_segs));
 
+			   // ip整个头部
 	if (!pskb_may_pull(skb, iph->ihl*4))
 		goto inhdr_error;
 
@@ -458,6 +470,7 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, 
 	if (unlikely(ip_fast_csum((u8 *)iph, iph->ihl)))
 		goto csum_error;
 
+		//ip数据包的总长度
 	len = ntohs(iph->tot_len);
 	if (skb->len < len) {
 		__IP_INC_STATS(net, IPSTATS_MIB_INTRUNCATEDPKTS);
@@ -474,6 +487,7 @@ int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, 
 		goto drop;
 	}
 
+	// 得到 传输层头部
 	iph = ip_hdr(skb);
 	skb->transport_header = skb->network_header + iph->ihl*4;
 

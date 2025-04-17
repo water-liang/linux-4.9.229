@@ -92,6 +92,7 @@ static int tcp_v4_md5_hash_hdr(char *md5_hash, const struct tcp_md5sig_key *key,
 			       __be32 daddr, __be32 saddr, const struct tcphdr *th);
 #endif
 
+//tcp 全局hash表
 struct inet_hashinfo tcp_hashinfo;
 EXPORT_SYMBOL(tcp_hashinfo);
 
@@ -1438,6 +1439,7 @@ int tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)
 	} else
 		sock_rps_save_rxhash(sk, skb);
 
+		// 状态处理
 	if (tcp_rcv_state_process(sk, skb)) {
 		rsk = sk;
 		goto reset;
@@ -1510,6 +1512,8 @@ bool tcp_prequeue(struct sock *sk, struct sk_buff *skb)
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 
+	// 低速处理
+	// 用户的task为空
 	if (sysctl_tcp_low_latency || !tp->ucopy.task)
 		return false;
 
@@ -1528,8 +1532,10 @@ bool tcp_prequeue(struct sock *sk, struct sk_buff *skb)
 	else
 		skb_dst_force_safe(skb);
 
+		// 加入队列
 	__skb_queue_tail(&tp->ucopy.prequeue, skb);
 	tp->ucopy.memory += skb->truesize;
+	// 空间不足
 	if (skb_queue_len(&tp->ucopy.prequeue) >= 32 ||
 	    tp->ucopy.memory + atomic_read(&sk->sk_rmem_alloc) > sk->sk_rcvbuf) {
 		struct sk_buff *skb1;
@@ -1543,6 +1549,7 @@ bool tcp_prequeue(struct sock *sk, struct sk_buff *skb)
 
 		tp->ucopy.memory = 0;
 	} else if (skb_queue_len(&tp->ucopy.prequeue) == 1) {
+		// 唤醒SOCK
 		wake_up_interruptible_sync_poll(sk_sleep(sk),
 					   POLLIN | POLLRDNORM | POLLRDBAND);
 		if (!inet_csk_ack_scheduled(sk))
@@ -1656,7 +1663,7 @@ int tcp_v4_rcv(struct sk_buff *skb)
 
 lookup:
 	// 在全局的hash中查找sk
-	// 先查找ehash
+	// 先查找establish hash
 	// 在查找listen hash
 	sk = __inet_lookup_skb(&tcp_hashinfo, skb, __tcp_hdrlen(th), th->source,
 			       th->dest, &refcounted);
@@ -1725,6 +1732,7 @@ process:
 
 	skb->dev = NULL;
 
+	// 监听状态
 	if (sk->sk_state == TCP_LISTEN) {
 		ret = tcp_v4_do_rcv(sk, skb);
 		goto put_and_return;
@@ -1735,11 +1743,14 @@ process:
 	bh_lock_sock_nested(sk);
 	tcp_segs_in(tcp_sk(sk), skb);
 	ret = 0;
+	// 核心处理
+	// sk_backlog是当socket处于用户进程的上下文时（即用户正在对socket进行系统调用，如recv），
+	// Linux收到数据包时，在软中断处理过程中，会将数据包保存到sk_backlog中，然后直接返回
 	if (!sock_owned_by_user(sk)) {
 		//  TCP 预队列
-		if (!tcp_prequeue(sk, skb))
-			ret = tcp_v4_do_rcv(sk, skb);
-	} else if (tcp_add_backlog(sk, skb)) {
+		if (!tcp_prequeue(sk, skb))//加入prequeue队列
+			ret = tcp_v4_do_rcv(sk, skb); // 未加入prequeue队列，则加入sk_receive_queue
+	} else if (tcp_add_backlog(sk, skb)) {  // 当sock被用户进程占有时，将数据包保存到backlog中，然后返回
 		goto discard_and_relse;
 	}
 	bh_unlock_sock(sk);

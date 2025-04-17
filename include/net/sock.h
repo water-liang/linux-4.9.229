@@ -882,6 +882,7 @@ static inline int sk_backlog_rcv(struct sock *sk, struct sk_buff *skb)
 	if (sk_memalloc_socks() && skb_pfmemalloc(skb))
 		return __sk_backlog_rcv(sk, skb);
 
+		// inet_create中被赋值
 	return sk->sk_backlog_rcv(sk, skb);
 }
 

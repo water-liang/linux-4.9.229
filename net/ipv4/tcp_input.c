@@ -4641,10 +4641,12 @@ static int __must_check tcp_queue_rcv(struct sock *sk, struct sk_buff *skb, int 
 	struct sk_buff *tail = skb_peek_tail(&sk->sk_receive_queue);
 
 	__skb_pull(skb, hdrlen);
+	//SKB合并
 	eaten = (tail &&
 		 tcp_try_coalesce(sk, tail, skb, fragstolen)) ? 1 : 0;
 	tcp_rcv_nxt_update(tcp_sk(sk), TCP_SKB_CB(skb)->end_seq);
 	if (!eaten) {
+		// 合并不了，加入skb_receive_queue
 		__skb_queue_tail(&sk->sk_receive_queue, skb);
 		skb_set_owner_r(skb, sk);
 	}
@@ -4712,6 +4714,7 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 		return;
 	}
 	skb_dst_drop(skb);
+	// 去掉tcp头部
 	__skb_pull(skb, tcp_hdr(skb)->doff * 4);
 
 	tcp_ecn_accept_cwr(tp, skb);
@@ -4723,6 +4726,7 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 	 *  Out of sequence packets to the out_of_order_queue.
 	 */
 	if (TCP_SKB_CB(skb)->seq == tp->rcv_nxt) {
+		// 本地的接受窗口为0，直接丢弃
 		if (tcp_receive_window(tp) == 0)
 			goto out_of_window;
 
@@ -4735,6 +4739,7 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 
 			__set_current_state(TASK_RUNNING);
 
+			// 拷贝到用户空间
 			if (!skb_copy_datagram_msg(skb, 0, tp->ucopy.msg, chunk)) {
 				tp->ucopy.len -= chunk;
 				tp->copied_seq += chunk;
@@ -4743,6 +4748,7 @@ static void tcp_data_queue(struct sock *sk, struct sk_buff *skb)
 			}
 		}
 
+		// 上面用户拷贝失败，可能用户层没有空间
 		if (eaten <= 0) {
 queue_and_out:
 			if (eaten < 0) {
@@ -4751,14 +4757,17 @@ queue_and_out:
 				else if (tcp_try_rmem_schedule(sk, skb, skb->truesize))
 					goto drop;
 			}
+			// skb加入skb_receive_queue
 			eaten = tcp_queue_rcv(sk, skb, 0, &fragstolen);
 		}
+		// skb状态更新
 		tcp_rcv_nxt_update(tp, TCP_SKB_CB(skb)->end_seq);
 		if (skb->len)
 			tcp_event_data_recv(sk, skb);
 		if (TCP_SKB_CB(skb)->tcp_flags & TCPHDR_FIN)
 			tcp_fin(sk);
 
+			// 乱序包队列处理
 		if (!RB_EMPTY_ROOT(&tp->out_of_order_queue)) {
 			tcp_ofo_queue(sk);
 
@@ -4777,29 +4786,34 @@ queue_and_out:
 		if (eaten > 0)
 			kfree_skb_partial(skb, fragstolen);
 		if (!sock_flag(sk, SOCK_DEAD))
-			sk->sk_data_ready(sk);
+			sk->sk_data_ready(sk); //唤醒SK
 		return;
 	}
 
+	// 收到重传包
 	if (!after(TCP_SKB_CB(skb)->end_seq, tp->rcv_nxt)) {
 		/* A retransmit, 2nd most common case.  Force an immediate ack. */
 		NET_INC_STATS(sock_net(sk), LINUX_MIB_DELAYEDACKLOST);
 		tcp_dsack_set(sk, TCP_SKB_CB(skb)->seq, TCP_SKB_CB(skb)->end_seq);
 
 out_of_window:
+		// 发送ack报文
 		tcp_enter_quickack_mode(sk, TCP_MAX_QUICKACKS);
 		inet_csk_schedule_ack(sk);
 drop:
+		//丢弃
 		tcp_drop(sk, skb);
 		return;
 	}
 
 	/* Out of window. F.e. zero window probe. */
 	if (!before(TCP_SKB_CB(skb)->seq, tp->rcv_nxt + tcp_receive_window(tp)))
+	//发送ACK
 		goto out_of_window;
 
 	if (before(TCP_SKB_CB(skb)->seq, tp->rcv_nxt)) {
 		/* Partial packet, seq < rcv_next < end_seq */
+		// 对方未收到ACK, 需要接受rcv_next--end_seq的包
 		SOCK_DEBUG(sk, "partial packet: rcv_next %X seq %X - %X\n",
 			   tp->rcv_nxt, TCP_SKB_CB(skb)->seq,
 			   TCP_SKB_CB(skb)->end_seq);
@@ -4809,11 +4823,13 @@ drop:
 		/* If window is closed, drop tail of packet. But after
 		 * remembering D-SACK for its head made in previous line.
 		 */
+		// 接受窗口判断
 		if (!tcp_receive_window(tp))
 			goto out_of_window;
 		goto queue_and_out;
 	}
 
+	// 乱序的处理
 	tcp_data_queue_ofo(sk, skb);
 }
 
@@ -5631,7 +5647,7 @@ step5:
 	/* Process urgent data. */
 	tcp_urg(sk, skb, th);
 
-	/* step 7: process the segment text */
+	/* step 7: process the segment text 处理数据包 */
 	tcp_data_queue(sk, skb);
 
 	tcp_data_snd_check(sk);

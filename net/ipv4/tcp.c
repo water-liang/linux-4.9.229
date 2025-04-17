@@ -1658,18 +1658,21 @@ int tcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int nonblock,
 	    (sk->sk_state == TCP_ESTABLISHED))
 		sk_busy_loop(sk, nonblock);
 
+		// 防止并发访问
 	lock_sock(sk);
 
 	err = -ENOTCONN;
 	if (sk->sk_state == TCP_LISTEN)
 		goto out;
 
+		// 超时时间
 	timeo = sock_rcvtimeo(sk, nonblock);
 
 	/* Urgent data needs to be handled specially. */
 	if (flags & MSG_OOB)
 		goto recv_urg;
 
+		// tcp的REPAIR模式
 	if (unlikely(tp->repair)) {
 		err = -EPERM;
 		if (!(flags & MSG_PEEK))
@@ -1685,12 +1688,15 @@ int tcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int nonblock,
 		/* 'common' recv queue MSG_PEEK-ing */
 	}
 
-	seq = &tp->copied_seq;
+	seq = &tp->copied_seq; //下一个拷贝给用户的seq
+
+	// MSG_PEEK 读取不改变数据
 	if (flags & MSG_PEEK) {
 		peek_seq = tp->copied_seq;
 		seq = &peek_seq;
 	}
 
+	// 需要读取的字节数
 	target = sock_rcvlowat(sk, flags & MSG_WAITALL, len);
 
 	do {
@@ -1708,6 +1714,7 @@ int tcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int nonblock,
 
 		/* Next get a buffer. */
 
+		// 去读sk_receive_queue队列，获取skb
 		last = skb_peek_tail(&sk->sk_receive_queue);
 		skb_queue_walk(&sk->sk_receive_queue, skb) {
 			last = skb;
@@ -1822,16 +1829,19 @@ int tcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int nonblock,
 			 * unfortunately.
 			 */
 			if (!skb_queue_empty(&tp->ucopy.prequeue))
-				goto do_prequeue;
+				goto do_prequeue; //处理prequeue
 
 			/* __ Set realtime policy in scheduler __ */
 		}
 
+		// 拷贝的数据 大于等于 需要的数据
+		// 拷贝完成
 		if (copied >= target) {
 			/* Do not sleep, just process backlog. */
-			release_sock(sk);
+			release_sock(sk); //处理backlog 放入receive_queue
 			lock_sock(sk);
 		} else {
+			// 等待receive_queue中有数据到来，睡眠
 			sk_wait_data(sk, &timeo, last);
 		}
 
@@ -1850,6 +1860,7 @@ int tcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len, int nonblock,
 			if (tp->rcv_nxt == tp->copied_seq &&
 			    !skb_queue_empty(&tp->ucopy.prequeue)) {
 do_prequeue:
+					// 将prequeue中的skb放入sk_receive_queue中
 				tcp_prequeue_process(sk);
 
 				chunk = len - tp->ucopy.len;
@@ -1893,7 +1904,9 @@ do_prequeue:
 			}
 		}
 
+		// 未超出缓存区大小
 		if (!(flags & MSG_TRUNC)) {
+			// 拷贝数据
 			err = skb_copy_datagram_msg(skb, offset, msg, used);
 			if (err) {
 				/* Exception. Bailout! */

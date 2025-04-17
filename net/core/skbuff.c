@@ -4569,8 +4569,9 @@ static struct sk_buff *skb_reorder_vlan_header(struct sk_buff *skb)
 		return NULL;
 	}
 
-	mac_len = skb->data - skb_mac_header(skb);
+	mac_len = skb->data - skb_mac_header(skb);//18字节  src_mac +dst_mac+vlan+type = 6+6+4+2
 	if (likely(mac_len > VLAN_HLEN + ETH_TLEN)) {
+		// 去掉vlan头部
 		memmove(skb_mac_header(skb) + VLAN_HLEN, skb_mac_header(skb),
 			mac_len - VLAN_HLEN - ETH_TLEN);
 	}
@@ -4599,9 +4600,12 @@ struct sk_buff *skb_vlan_untag(struct sk_buff *skb)
 	vlan_tci = ntohs(vhdr->h_vlan_TCI);
 	__vlan_hwaccel_put_tag(skb, skb->protocol, vlan_tci);
 
+	// data 指向 vlan(4字节) 后面
 	skb_pull_rcsum(skb, VLAN_HLEN);
+	// 指向skb->protocol
 	vlan_set_encap_proto(skb, vhdr);
 
+	// 去掉vlan头部
 	skb = skb_reorder_vlan_header(skb);
 	if (unlikely(!skb))
 		goto err_free;

@@ -1525,6 +1525,7 @@ struct rtable *rt_dst_alloc(struct net_device *dev,
 		INIT_LIST_HEAD(&rt->rt_uncached);
 
 		rt->dst.output = ip_output;// 赋值output
+		//分包的目的地址是本机
 		if (flags & RTCF_LOCAL)
 			rt->dst.input = ip_local_deliver;
 	}
@@ -1741,6 +1742,7 @@ rt_cache:
 		rth->rt_table_id = res->table->tb_id;
 	RT_CACHE_STAT_INC(in_slow_tot);
 
+	//不是本机的
 	rth->dst.input = ip_forward;
 
 	rt_set_nexthop(rth, daddr, res, fnhe, res->fi, res->type, itag);

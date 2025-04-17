@@ -1042,6 +1042,7 @@ dm9000_start_xmit(struct sk_buff *skb, struct net_device *dev)
 
 	db->tx_pkt_cnt++;
 	/* TX control: First packet immediately send, second packet queue */
+	// 发送
 	if (db->tx_pkt_cnt == 1) {
 		dm9000_send_packet(dev, skb->ip_summed, skb->len);
 	} else {
@@ -1080,7 +1081,7 @@ static void dm9000_tx_done(struct net_device *dev, struct board_info *db)
 		if (db->tx_pkt_cnt > 0)
 			dm9000_send_packet(dev, db->queue_ip_summed,
 					   db->queue_pkt_len);
-		netif_wake_queue(dev);
+		netif_wake_queue(dev);//唤醒上层协议栈
 	}
 }
 
@@ -1124,6 +1125,7 @@ dm9000_rx(struct net_device *dev)
 		GoodPacket = true;
 		writeb(DM9000_MRCMD, db->io_addr);
 
+		// 读取头部数据
 		(db->inblk)(db->io_data, &rxhdr, sizeof(rxhdr));
 
 		RxLen = le16_to_cpu(rxhdr.RxLen);
@@ -1169,6 +1171,7 @@ dm9000_rx(struct net_device *dev)
 		if (GoodPacket &&
 		    ((skb = netdev_alloc_skb(dev, RxLen + 4)) != NULL)) {
 			skb_reserve(skb, 2);
+			// 去掉dm9000_rxhdr
 			rdptr = (u8 *) skb_put(skb, RxLen - 4);
 
 			/* Read received packet from RX SRAM */
@@ -1177,6 +1180,9 @@ dm9000_rx(struct net_device *dev)
 			dev->stats.rx_bytes += RxLen;
 
 			/* Pass to upper layer */
+			// 交给上层协议
+			// 包含以太网头部
+			// 此处的skb->protocol是以太网协议类型
 			skb->protocol = eth_type_trans(skb, dev);
 			if (dev->features & NETIF_F_RXCSUM) {
 				if ((((rxbyte & 0x1c) << 3) & rxbyte) == 0)
@@ -1184,6 +1190,7 @@ dm9000_rx(struct net_device *dev)
 				else
 					skb_checksum_none_assert(skb);
 			}
+			// 交给协议栈，触发软中断
 			netif_rx(skb);
 			dev->stats.rx_packets++;
 
@@ -1195,6 +1202,7 @@ dm9000_rx(struct net_device *dev)
 	} while (rxbyte & DM9000_PKT_RDY);
 }
 
+// 中断函数
 static irqreturn_t dm9000_interrupt(int irq, void *dev_id)
 {
 	struct net_device *dev = dev_id;
@@ -1319,6 +1327,7 @@ dm9000_open(struct net_device *dev)
 	/* Initialize DM9000 board */
 	dm9000_init_dm9000(dev);
 
+	// 注册中断服务函数
 	if (request_irq(dev->irq, dm9000_interrupt, irq_flags, dev->name, dev))
 		return -EAGAIN;
 	/* Now that we have an interrupt handler hooked up we can unmask

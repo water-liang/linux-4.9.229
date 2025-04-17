@@ -484,6 +484,7 @@ int ip_defrag(struct net *net, struct sk_buff *skb, u32 user)
 
 		spin_lock(&qp->q.lock);
 
+		// 分片重组，重组成功返回0
 		ret = ip_frag_queue(qp, skb);
 
 		spin_unlock(&qp->q.lock);

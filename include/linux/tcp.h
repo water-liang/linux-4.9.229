@@ -169,7 +169,7 @@ struct tcp_sock {
 				 */
  	u32	rcv_nxt;	/* What we want to receive next 	*/
 	u32	copied_seq;	/* Head of yet unread data		*/
-	u32	rcv_wup;	/* rcv_nxt on last window update sent	*/
+	u32	rcv_wup;	/* rcv_nxt on last window update sent	已经接受但是未发送ack*/
  	u32	snd_nxt;	/* Next sequence we send		*/
 	u32	segs_out;	/* RFC4898 tcpEStatsPerfSegsOut
 				 * The total number of segments sent.

@@ -125,7 +125,7 @@
 /* The inetsw table contains everything that inet_create needs to
  * build a new socket.
  */
-static struct list_head inetsw[SOCK_MAX];
+static struct list_head inetsw[SOCK_MAX];//socket 接口
 static DEFINE_SPINLOCK(inetsw_lock);
 
 /* New destruction routine */
@@ -1010,6 +1010,7 @@ static const struct net_proto_family inet_family_ops = {
 /* Upon startup we insert all the elements in inetsw_array[] into
  * the linked list inetsw.
  */
+//socket 接口
 static struct inet_protosw inetsw_array[] =
 {
 	{
@@ -1590,6 +1591,7 @@ static const struct net_protocol igmp_protocol = {
 };
 #endif
 
+// 协议
 static const struct net_protocol tcp_protocol = {
 	.early_demux	=	tcp_v4_early_demux,
 	.handler	=	tcp_v4_rcv,
@@ -1776,6 +1778,7 @@ static int __init ipv4_offload_init(void)
 
 fs_initcall(ipv4_offload_init);
 
+// ip协议
 static struct packet_type ip_packet_type __read_mostly = {
 	.type = cpu_to_be16(ETH_P_IP),
 	.func = ip_rcv,
@@ -1819,6 +1822,7 @@ static int __init inet_init(void)
 	 *	Add all the base protocols.
 	 */
 
+	 // 注册协议
 	if (inet_add_protocol(&icmp_protocol, IPPROTO_ICMP) < 0)
 		pr_crit("%s: Cannot add ICMP protocol\n", __func__);
 	if (inet_add_protocol(&udp_protocol, IPPROTO_UDP) < 0)
@@ -1890,6 +1894,7 @@ static int __init inet_init(void)
 
 	ipfrag_init();
 
+	// 注册ip协议
 	dev_add_pack(&ip_packet_type);
 
 	ip_tunnel_core_init();

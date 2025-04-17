@@ -672,8 +672,8 @@ struct sk_buff {
 #if IS_ENABLED(CONFIG_BRIDGE_NETFILTER)
 	struct nf_bridge_info	*nf_bridge;
 #endif
-	unsigned int		len,
-				data_len;
+	unsigned int		len, // 线性区 + 非线性区域
+				data_len; // 非线性区大小
 	__u16			mac_len,
 				hdr_len;
 
@@ -795,7 +795,7 @@ struct sk_buff {
 	__be16			protocol;
 	__u16			transport_header;
 	__u16			network_header;
-	__u16			mac_header;
+	__u16			mac_header; // mac偏移量
 
 	/* private: */
 	__u32			headers_end[0];
@@ -848,6 +848,7 @@ static inline struct dst_entry *skb_dst(const struct sk_buff *skb)
 	WARN_ON((skb->_skb_refdst & SKB_DST_NOREF) &&
 		!rcu_read_lock_held() &&
 		!rcu_read_lock_bh_held());
+		// 因为是字节对齐，最后BIT肯定为0，所有拿出来作别的用处
 	return (struct dst_entry *)(skb->_skb_refdst & SKB_DST_PTRMASK);
 }
 

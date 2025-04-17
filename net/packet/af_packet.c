@@ -3297,7 +3297,7 @@ static int packet_create(struct net *net, struct socket *sock, int protocol,
 	spin_lock_init(&po->bind_lock);
 	mutex_init(&po->pg_vec_lock);
 	po->rollover = NULL;
-	po->prot_hook.func = packet_rcv;
+	po->prot_hook.func = packet_rcv; //tcpdump rcv函数
 
 	if (sock->type == SOCK_PACKET)
 		po->prot_hook.func = packet_rcv_spkt;

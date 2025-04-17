@@ -2095,7 +2095,7 @@ void __sk_flush_backlog(struct sock *sk)
 int sk_wait_data(struct sock *sk, long *timeo, const struct sk_buff *skb)
 {
 	int rc;
-	DEFINE_WAIT(wait);
+	DEFINE_WAIT(wait);// 这里面注册了唤醒后执行的函数
 
 	prepare_to_wait(sk_sleep(sk), &wait, TASK_INTERRUPTIBLE);
 	sk_set_bit(SOCKWQ_ASYNC_WAITDATA, sk);
@@ -2371,6 +2371,8 @@ static void sock_def_readable(struct sock *sk)
 
 	rcu_read_lock();
 	wq = rcu_dereference(sk->sk_wq);
+	// 唤醒等待队列上的进程，执行对应的func
+	// 唤醒一个
 	if (skwq_has_sleeper(wq))
 		wake_up_interruptible_sync_poll(&wq->wait, POLLIN | POLLPRI |
 						POLLRDNORM | POLLRDBAND);
@@ -2459,7 +2461,7 @@ void sock_init_data(struct socket *sock, struct sock *sk)
 			af_family_clock_key_strings[sk->sk_family]);
 
 	sk->sk_state_change	=	sock_def_wakeup;
-	sk->sk_data_ready	=	sock_def_readable;
+	sk->sk_data_ready	=	sock_def_readable; //read data抵达，唤醒函数
 	sk->sk_write_space	=	sock_def_write_space;
 	sk->sk_error_report	=	sock_def_error_report;
 	sk->sk_destruct		=	sock_def_destruct;

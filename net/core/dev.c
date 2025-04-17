@@ -153,6 +153,7 @@
 
 static DEFINE_SPINLOCK(ptype_lock);
 static DEFINE_SPINLOCK(offload_lock);
+// 协议hash表
 struct list_head ptype_base[PTYPE_HASH_SIZE] __read_mostly;
 struct list_head ptype_all __read_mostly;	/* Taps */
 static struct list_head offload_base __read_mostly;
@@ -2973,6 +2974,7 @@ static int xmit_one(struct sk_buff *skb, struct net_device *dev,
 
 	len = skb->len;
 	trace_net_dev_start_xmit(skb, dev);
+	// 发送
 	rc = netdev_start_xmit(skb, dev, txq, more);
 	trace_net_dev_xmit(skb, rc, dev, len);
 
@@ -2989,7 +2991,9 @@ struct sk_buff *dev_hard_start_xmit(struct sk_buff *first, struct net_device *de
 		struct sk_buff *next = skb->next;
 
 		skb->next = NULL;
+		// 发送
 		rc = xmit_one(skb, dev, txq, next != NULL);
+		//发送状态判断
 		if (unlikely(!dev_xmit_complete(rc))) {
 			skb->next = next;
 			goto out;
@@ -3441,7 +3445,7 @@ static int __dev_queue_xmit(struct sk_buff *skb, void *accel_priv)
 
 	trace_net_dev_queue(skb);
 	if (q->enqueue) {
-		// dev存在txq队列，进行处理
+		// dev存在txq 发送队列，进行处理
 		rc = __dev_xmit_skb(skb, q, dev, txq);
 		goto out;
 	}
@@ -3536,7 +3540,7 @@ static inline void ____napi_schedule(struct softnet_data *sd,
 				     struct napi_struct *napi)
 {
 	list_add_tail(&napi->poll_list, &sd->poll_list);
-	__raise_softirq_irqoff(NET_RX_SOFTIRQ);
+	__raise_softirq_irqoff(NET_RX_SOFTIRQ);//开启网络接收软中断
 }
 
 #ifdef CONFIG_RPS
@@ -3829,6 +3833,9 @@ static int enqueue_to_backlog(struct sk_buff *skb, int cpu,
 	if (qlen <= netdev_max_backlog && !skb_flow_limit(skb, qlen)) {
 		if (qlen) {
 enqueue:
+			// skb 入队 input_pkt_queue
+			// 如果input_pkt_queue不为空，说明虚拟设备已经得到调度，此时仅仅把数据加入 input_pkt_queue队列即可
+			// 加入到队列
 			__skb_queue_tail(&sd->input_pkt_queue, skb);
 			input_queue_tail_incr_save(sd, qtail);
 			rps_unlock(sd);
@@ -3839,9 +3846,11 @@ enqueue:
 		/* Schedule NAPI for backlog device
 		 * We can use non atomic operation since we own the queue lock
 		 */
+		//if返回0的情况下，需要将sd->backlog挂到sd->poll_list上，并激活软中断。
 		if (!__test_and_set_bit(NAPI_STATE_SCHED, &sd->backlog.state)) {
+			// RPS相关
 			if (!rps_ipi_queued(sd))
-				____napi_schedule(sd, &sd->backlog);
+				____napi_schedule(sd, &sd->backlog);// 触发软中断
 		}
 		goto enqueue;
 	}
@@ -3883,6 +3892,7 @@ static int netif_rx_internal(struct sk_buff *skb)
 	} else
 #endif
 	{
+		// 放置到当前cpu上
 		unsigned int qtail;
 		ret = enqueue_to_backlog(skb, get_cpu(), &qtail);
 		put_cpu();
@@ -4175,6 +4185,7 @@ static int __netif_receive_skb_core(struct sk_buff *skb, bool pfmemalloc)
 	skb_reset_network_header(skb);
 	if (!skb_transport_header_was_set(skb))
 		skb_reset_transport_header(skb);
+		// 获取 以太网头部大小
 	skb_reset_mac_len(skb);
 
 	pt_prev = NULL;
@@ -4184,8 +4195,11 @@ another_round:
 
 	__this_cpu_inc(softnet_data.processed);
 
+	// 处理vlan
+	// data指向的是 vlan的tpid的末尾，PRI的开头
 	if (skb->protocol == cpu_to_be16(ETH_P_8021Q) ||
 	    skb->protocol == cpu_to_be16(ETH_P_8021AD)) {
+			// 去掉vlan头
 		skb = skb_vlan_untag(skb);
 		if (unlikely(!skb))
 			goto out;
@@ -4201,9 +4215,11 @@ another_round:
 	if (pfmemalloc)
 		goto skip_taps;
 
+		// ptype_all 协议处理
+		// ptype_all --》 接受所有的数据分包
 	list_for_each_entry_rcu(ptype, &ptype_all, list) {
 		if (pt_prev)
-			ret = deliver_skb(skb, pt_prev, orig_dev);
+			ret = deliver_skb(skb, pt_prev, orig_dev);//处理函数
 		pt_prev = ptype;
 	}
 
@@ -4231,6 +4247,7 @@ ncls:
 	if (pfmemalloc && !skb_pfmemalloc_protocol(skb))
 		goto drop;
 
+		// vlan处理
 	if (skb_vlan_tag_present(skb)) {
 		if (pt_prev) {
 			ret = deliver_skb(skb, pt_prev, orig_dev);
@@ -4242,6 +4259,7 @@ ncls:
 			goto out;
 	}
 
+	//rx_handler 函数处理
 	rx_handler = rcu_dereference(skb->dev->rx_handler);
 	if (rx_handler) {
 		if (pt_prev) {
@@ -4294,7 +4312,7 @@ ncls:
 		if (unlikely(skb_orphan_frags(skb, GFP_ATOMIC)))
 			goto drop;
 		else
-			ret = pt_prev->func(skb, skb->dev, pt_prev, orig_dev);
+			ret = pt_prev->func(skb, skb->dev, pt_prev, orig_dev);//执行函数
 	} else {
 drop:
 		if (!deliver_exact)
@@ -4312,6 +4330,7 @@ out:
 	return ret;
 }
 
+// 提交协议栈
 static int __netif_receive_skb(struct sk_buff *skb)
 {
 	int ret;
@@ -4957,6 +4976,7 @@ static int process_backlog(struct napi_struct *napi, int quota)
 
 		while ((skb = __skb_dequeue(&sd->process_queue))) {
 			rcu_read_lock();
+			// 提交协议栈处理
 			__netif_receive_skb(skb);
 			rcu_read_unlock();
 			input_queue_head_incr(sd);
@@ -5249,6 +5269,7 @@ static int napi_poll(struct napi_struct *n, struct list_head *repoll)
 
 	list_del_init(&n->poll_list);
 
+	// 锁
 	have = netpoll_poll_lock(n);
 
 	weight = n->weight;
@@ -5326,6 +5347,7 @@ static __latent_entropy void net_rx_action(struct softirq_action *h)
 		}
 
 		n = list_first_entry(&list, struct napi_struct, poll_list);
+		// 处理
 		budget -= napi_poll(n, &repoll);
 
 		/* If softirq window is exhausted then punt.
@@ -5342,11 +5364,13 @@ static __latent_entropy void net_rx_action(struct softirq_action *h)
 	__kfree_skb_flush();
 	local_irq_disable();
 
+	// repoll全部写入sd->poll_list
 	list_splice_tail_init(&sd->poll_list, &list);
 	list_splice_tail(&repoll, &list);
 	list_splice(&list, &sd->poll_list);
+
 	if (!list_empty(&sd->poll_list))
-		__raise_softirq_irqoff(NET_RX_SOFTIRQ);
+		__raise_softirq_irqoff(NET_RX_SOFTIRQ);//再次触发软中断
 
 	net_rps_action_and_irq_enable(sd);
 }
@@ -8448,6 +8472,7 @@ static int __init net_dev_init(void)
 		sd->cpu = i;
 #endif
 
+		// poll函数的初始化
 		sd->backlog.poll = process_backlog;
 		sd->backlog.weight = weight_p;
 	}

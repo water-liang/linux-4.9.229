@@ -181,7 +181,7 @@ int sch_direct_xmit(struct sk_buff *skb, struct Qdisc *q,
 
 	if (likely(skb)) {
 		HARD_TX_LOCK(dev, txq, smp_processor_id());
-		// 发送不停止
+		// 发送未停止
 		if (!netif_xmit_frozen_or_stopped(txq))
 			skb = dev_hard_start_xmit(skb, dev, txq, &ret);
 
@@ -249,6 +249,10 @@ static inline int qdisc_restart(struct Qdisc *q, int *packets)
 	txq = skb_get_tx_queue(dev, skb);
 
 	return sch_direct_xmit(skb, q, dev, txq, root_lock, validate);
+
+
+
+
 }
 
 void __qdisc_run(struct Qdisc *q)

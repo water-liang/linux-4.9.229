@@ -2229,13 +2229,14 @@ static inline struct sk_buff **call_gro_receive_sk(gro_receive_sk_t cb,
 	return cb(sk, head, skb);
 }
 
+// 协议
 struct packet_type {
 	__be16			type;	/* This is really htons(ether_type). */
 	struct net_device	*dev;	/* NULL is wildcarded here	     */
 	int			(*func) (struct sk_buff *,
 					 struct net_device *,
 					 struct packet_type *,
-					 struct net_device *);
+					 struct net_device *);	// 处理函数
 	bool			(*id_match)(struct packet_type *ptype,
 					    struct sock *sk);
 	void			*af_packet_priv;
@@ -4081,6 +4082,7 @@ static inline netdev_tx_t __netdev_start_xmit(const struct net_device_ops *ops,
 static inline netdev_tx_t netdev_start_xmit(struct sk_buff *skb, struct net_device *dev,
 					    struct netdev_queue *txq, bool more)
 {
+	//网卡驱动的操作函数
 	const struct net_device_ops *ops = dev->netdev_ops;
 	int rc;
 

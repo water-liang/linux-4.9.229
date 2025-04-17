@@ -459,6 +459,7 @@ ixgb_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	netdev->netdev_ops = &ixgb_netdev_ops;
 	ixgb_set_ethtool_ops(netdev);
 	netdev->watchdog_timeo = 5 * HZ;
+	// 初始化napi
 	netif_napi_add(netdev, &adapter->napi, ixgb_clean, 64);
 
 	strncpy(netdev->name, pci_name(pdev), sizeof(netdev->name) - 1);
@@ -1804,7 +1805,7 @@ ixgb_intr(int irq, void *data)
 		*/
 
 		IXGB_WRITE_REG(&adapter->hw, IMC, ~0);
-		__napi_schedule(&adapter->napi);
+		__napi_schedule(&adapter->napi);//触发软中断
 	}
 	return IRQ_HANDLED;
 }

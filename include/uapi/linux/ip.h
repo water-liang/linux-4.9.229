@@ -84,7 +84,7 @@
 
 struct iphdr {
 #if defined(__LITTLE_ENDIAN_BITFIELD)
-	__u8	ihl:4,
+	__u8	ihl:4,	//长度，字节为单位
 		version:4;
 #elif defined (__BIG_ENDIAN_BITFIELD)
 	__u8	version:4,
