@@ -5873,7 +5873,7 @@ static int tcp_rcv_synsent_state_process(struct sock *sk, struct sk_buff *skb,
 
 		smp_mb();
 
-		// sk状态
+		// sk状态为ESTABLISH
 		tcp_finish_connect(sk, skb);
 
 		fastopen_fail = (tp->syn_fastopen || tp->syn_data) &&
@@ -6030,6 +6030,8 @@ int tcp_rcv_state_process(struct sock *sk, struct sk_buff *skb)
 			 */
 			rcu_read_lock();
 			local_bh_disable();
+			// icsk_af_ops --> ipv4_specific
+			// 最终指向 tcp_v4_conn_request
 			acceptable = icsk->icsk_af_ops->conn_request(sk, skb) >= 0;
 			local_bh_enable();
 			rcu_read_unlock();
@@ -6336,6 +6338,7 @@ static void tcp_openreq_init(struct request_sock *req,
 	ireq->ir_mark = inet_request_mark(sk, skb);
 }
 
+// reqsk 申请
 struct request_sock *inet_reqsk_alloc(const struct request_sock_ops *ops,
 				      struct sock *sk_listener,
 				      bool attach_listener)
@@ -6427,6 +6430,7 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 	 * limitations, they conserve resources and peer is
 	 * evidently real one.
 	 */
+	// 半连接队列是否满
 	if ((net->ipv4.sysctl_tcp_syncookies == 2 ||
 	     inet_csk_reqsk_queue_is_full(sk)) && !isn) {
 		want_cookie = tcp_syn_flood_action(sk, skb, rsk_ops->slab_name);
@@ -6548,7 +6552,7 @@ int tcp_conn_request(struct request_sock_ops *rsk_ops,
 	} else {
 		tcp_rsk(req)->tfo_listener = false;
 		if (!want_cookie)
-			inet_csk_reqsk_queue_hash_add(sk, req, TCP_TIMEOUT_INIT);// 加入半连接队列、队列长度+1
+			inet_csk_reqsk_queue_hash_add(sk, req, TCP_TIMEOUT_INIT);// 加入半连接队列、队列长度+1，定时器
 			
 		// 发送synack
 		af_ops->send_synack(sk, dst, &fl, req, &foc,

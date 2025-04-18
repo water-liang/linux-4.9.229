@@ -624,6 +624,7 @@ static void reqsk_queue_hash_req(struct request_sock *req,
 	req->num_timeout = 0;
 	req->sk = NULL;
 
+	// 定时器
 	setup_pinned_timer(&req->rsk_timer, reqsk_timer_handler,
 			    (unsigned long)req);
 	mod_timer(&req->rsk_timer, jiffies + timeout);

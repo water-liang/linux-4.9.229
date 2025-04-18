@@ -1697,6 +1697,7 @@ process:
 		 */
 		sock_hold(sk);
 		refcounted = true;
+		// 设置状态变为SYN_RECV
 		nsk = tcp_check_req(sk, skb, req, false);
 		if (!nsk) {
 			reqsk_put(req);
